@@ -1,0 +1,35 @@
+name: operantix
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: operantix
+      POSTGRES_USER: operantix
+      POSTGRES_PASSWORD: operantix-local
+    ports:
+      - "5432:5432"
+    volumes:
+      - operantix_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U operantix -d operantix"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+# Kafka, MongoDB and observability services are intentionally deferred
+# to their roadmap modules. Do not add them to Foundation just because
+# they appear in the target architecture.
+
+volumes:
+  operantix_postgres:

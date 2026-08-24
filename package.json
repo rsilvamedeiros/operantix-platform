@@ -1,0 +1,21 @@
+{
+  "name": "operantix-platform",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Operantix polyglot monorepo foundation",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:ci": "turbo run test -- --runInBand",
+    "format:check": "echo \"Configure formatter in module M00\""
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
