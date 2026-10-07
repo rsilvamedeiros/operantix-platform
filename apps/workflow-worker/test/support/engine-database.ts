@@ -60,19 +60,20 @@ export async function startEngineDatabase(): Promise<EngineDatabase> {
       const organizationId = options.organizationId ?? randomUUID();
       if (!organizations.has(organizationId)) {
         organizations.add(organizationId);
-        await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $1, $1)`, [
+        await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $2)`, [
           organizationId,
+          `org-${organizationId}`,
         ]);
       }
       const workspace = randomUUID();
       const workflow = randomUUID();
       await owner.query(
-        `INSERT INTO workspaces (id, organization_id, name, slug) VALUES ($1, $2, $1, $1)`,
-        [workspace, organizationId],
+        `INSERT INTO workspaces (id, organization_id, name, slug) VALUES ($1, $2, 'Prod', $3)`,
+        [workspace, organizationId, `ws-${workspace}`],
       );
       await owner.query(
-        `INSERT INTO workflows (id, organization_id, workspace_id, key, name) VALUES ($1, $2, $3, $1, $1)`,
-        [workflow, organizationId, workspace],
+        `INSERT INTO workflows (id, organization_id, workspace_id, key, name) VALUES ($1, $2, $3, $4, 'Flow')`,
+        [workflow, organizationId, workspace, `wf-${workflow}`],
       );
       await owner.query(
         `INSERT INTO workflow_versions (organization_id, workflow_id, version, definition, created_by)
