@@ -24,7 +24,8 @@ Lifecycle de uma execução e de cada step, tentativas, status, outputs e erros.
 - State machine: `PENDING → RUNNING | CANCELLED`, `RUNNING → SUCCEEDED | FAILED | CANCELLED`; `SUCCEEDED`, `FAILED` e `CANCELLED` são terminais.
 - Start manual idempotente por `Idempotency-Key` (fingerprint SHA-256 do body canônico).
 - Fila `execution_jobs` em PostgreSQL (ADR-0018, ADR-0019): um job por execução, criado na mesma transação; o worker faz lease com `SKIP LOCKED` usando o papel `operantix_worker`.
-- Ainda não implementado: worker, despacho de steps, tentativas/retry e timeline.
+- `apps/workflow-worker` faz claim, roda os steps em ordem com resultado commitado por step (retomável após crash), marca a execução `SUCCEEDED`/`FAILED` e apaga o job; `max_attempts` limita claims de uma execução que nunca termina.
+- Ainda não implementado: steps `http_request` e `delay`, classificação de erros para retry e timeline.
 
 ## Interfaces
 
