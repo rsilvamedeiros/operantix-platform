@@ -103,3 +103,15 @@ export const executionPageResponse = z.object({
   data: z.array(executionResponse),
   nextCursor: z.string().nullable(),
 });
+
+export const executionTimelineResponse = z.object({
+  data: z.array(
+    z.object({
+      type: z.string(),
+      stepId: z.string().nullable(),
+      attempt: z.int().min(1).nullable(),
+      details: z.record(z.string(), z.unknown()).nullable(),
+      occurredAt: timestamp,
+    }),
+  ),
+});
