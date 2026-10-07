@@ -11,7 +11,7 @@ import {
 import { OrganizationSlugTakenError, OrganizationsService } from './organizations.service';
 
 // Not tenant-scoped: any authenticated caller may create an organization or list their own.
-@Controller('v1/organizations')
+@Controller('api/v1/organizations')
 export class OrganizationsController {
   constructor(private readonly organizations: OrganizationsService) {}
 

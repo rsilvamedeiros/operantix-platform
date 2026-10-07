@@ -81,7 +81,7 @@ interface StatusResponse {
   status(code: number): unknown;
 }
 
-@Controller('v1/organizations/:organizationId')
+@Controller('api/v1/organizations/:organizationId')
 export class ExecutionsController {
   constructor(private readonly executions: ExecutionsService) {}
 

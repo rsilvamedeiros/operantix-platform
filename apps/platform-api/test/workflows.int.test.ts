@@ -84,7 +84,7 @@ describe('workflows API', () => {
 
   const as = async (sub: string) => `Bearer ${await issuer.token(sub)}`;
   const workflowsOf = (org: string, workspace: string) =>
-    `/v1/organizations/${org}/workspaces/${workspace}/workflows`;
+    `/api/v1/organizations/${org}/workspaces/${workspace}/workflows`;
 
   const createWorkflow = async (
     sub: string,
@@ -175,11 +175,11 @@ describe('workflows API', () => {
     const auth = await as(developer.sub);
 
     const v2 = await request(httpServer(app))
-      .post(`/v1/organizations/${acme}/workflows/${id}/versions`)
+      .post(`/api/v1/organizations/${acme}/workflows/${id}/versions`)
       .set('Authorization', auth)
       .send({ definition: definition('second') });
     const v3 = await request(httpServer(app))
-      .post(`/v1/organizations/${acme}/workflows/${id}/versions`)
+      .post(`/api/v1/organizations/${acme}/workflows/${id}/versions`)
       .set('Authorization', auth)
       .send({ definition: definition('third') });
 
@@ -188,7 +188,7 @@ describe('workflows API', () => {
     expect(v3.body).toMatchObject({ version: 3 });
 
     const workflow = await request(httpServer(app))
-      .get(`/v1/organizations/${acme}/workflows/${id}`)
+      .get(`/api/v1/organizations/${acme}/workflows/${id}`)
       .set('Authorization', auth);
     expect(workflow.body).toMatchObject({ latestVersion: 3 });
     expect(
@@ -196,7 +196,7 @@ describe('workflows API', () => {
     ).toEqual([3, 2, 1]);
 
     const version2 = await request(httpServer(app))
-      .get(`/v1/organizations/${acme}/workflows/${id}/versions/2`)
+      .get(`/api/v1/organizations/${acme}/workflows/${id}/versions/2`)
       .set('Authorization', auth);
     expect(version2.status).toBe(200);
     expect(version2.body).toMatchObject({ version: 2, definition: definition('second') });
@@ -210,7 +210,7 @@ describe('workflows API', () => {
     const results = await Promise.all(
       Array.from({ length: 5 }, (_, i) =>
         request(httpServer(app))
-          .post(`/v1/organizations/${acme}/workflows/${id}/versions`)
+          .post(`/api/v1/organizations/${acme}/workflows/${id}/versions`)
           .set('Authorization', auth)
           .send({ definition: definition(`v${String(i)}`) }),
       ),
@@ -227,7 +227,7 @@ describe('workflows API', () => {
     const { id } = created.body as WorkflowBody;
 
     const res = await request(httpServer(app))
-      .get(`/v1/organizations/${acme}/workflows/${id}/versions/9`)
+      .get(`/api/v1/organizations/${acme}/workflows/${id}/versions/9`)
       .set('Authorization', await as(developer.sub));
 
     expect(res.status).toBe(404);
@@ -239,10 +239,10 @@ describe('workflows API', () => {
     const { id } = created.body as WorkflowBody;
 
     const read = await request(httpServer(app))
-      .get(`/v1/organizations/${globex}/workflows/${id}`)
+      .get(`/api/v1/organizations/${globex}/workflows/${id}`)
       .set('Authorization', await as(outsider.sub));
     const write = await request(httpServer(app))
-      .post(`/v1/organizations/${globex}/workflows/${id}/versions`)
+      .post(`/api/v1/organizations/${globex}/workflows/${id}/versions`)
       .set('Authorization', await as(outsider.sub))
       .send({ definition: definition('hijack') });
 
@@ -253,13 +253,13 @@ describe('workflows API', () => {
 
   describe('activation', () => {
     const activationOf = (id: string, org: string = acme) =>
-      `/v1/organizations/${org}/workflows/${id}/activation`;
+      `/api/v1/organizations/${org}/workflows/${id}/activation`;
 
     const workflowWithTwoVersions = async (key: string): Promise<string> => {
       const created = await createWorkflow(developer.sub, key);
       const { id } = created.body as WorkflowBody;
       await request(httpServer(app))
-        .post(`/v1/organizations/${acme}/workflows/${id}/versions`)
+        .post(`/api/v1/organizations/${acme}/workflows/${id}/versions`)
         .set('Authorization', await as(developer.sub))
         .send({ definition: definition('second') });
       return id;

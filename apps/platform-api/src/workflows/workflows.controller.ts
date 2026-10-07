@@ -65,7 +65,7 @@ async function mapped<T>(work: Promise<T>): Promise<T> {
   }
 }
 
-@Controller('v1/organizations/:organizationId')
+@Controller('api/v1/organizations/:organizationId')
 export class WorkflowsController {
   constructor(private readonly workflows: WorkflowsService) {}
 

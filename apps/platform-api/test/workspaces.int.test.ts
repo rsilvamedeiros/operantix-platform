@@ -72,7 +72,7 @@ describe('workspaces API with tenant context, RBAC and audit', () => {
   });
 
   const as = async (sub: string) => `Bearer ${await issuer.token(sub)}`;
-  const workspacesOf = (org: string) => `/v1/organizations/${org}/workspaces`;
+  const workspacesOf = (org: string) => `/api/v1/organizations/${org}/workspaces`;
 
   it('lists only the workspaces of the organization the caller belongs to', async () => {
     const res = await request(httpServer(app))

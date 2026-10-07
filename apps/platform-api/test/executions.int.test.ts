@@ -81,7 +81,7 @@ describe('executions API', () => {
   });
 
   const as = async (sub: string) => `Bearer ${await issuer.token(sub)}`;
-  const base = `/v1/organizations/${acme}`;
+  const base = `/api/v1/organizations/${acme}`;
 
   /** A workflow created by a developer-like owner insert, optionally activated. */
   const workflow = async (key: string, active: boolean): Promise<string> => {
@@ -147,7 +147,7 @@ describe('executions API', () => {
     const id = await workflow('foreign-start', true);
 
     const res = await request(httpServer(app))
-      .post(`/v1/organizations/${globex}/workflows/${id}/executions`)
+      .post(`/api/v1/organizations/${globex}/workflows/${id}/executions`)
       .set('Authorization', await as(outsider.sub))
       .send({});
 

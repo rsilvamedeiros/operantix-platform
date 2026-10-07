@@ -16,24 +16,26 @@ pnpm --filter @operantix/platform-api start
 
 ## Endpoints
 
+A API de negócio fica sob `/api/v1` (`docs/api/versioning.md`). `/health/*` e `/openapi.json` ficam fora do prefixo, para probes e ferramentas não dependerem da versão.
+
 | Endpoint | Uso | Resposta |
 | --- | --- | --- |
 | `GET /health/live` | Liveness: o processo responde. Não consulta dependências. | `200 {"status":"ok"}` |
-| `GET /v1/me` | Principal autenticado (requer `Authorization: Bearer <token>`). | `200 {"subject":"..."}`; `401 {"code":"UNAUTHENTICATED",...}` |
-| `GET /v1/organizations` | Organizações do usuário logado, com o papel em cada uma. | `200 {"data":[{"id","name","slug","role"}]}` |
-| `POST /v1/organizations` | Cria organização `{"name","slug"}`; quem cria vira `OWNER`. Cadastra o usuário no primeiro acesso. | `201 {"id","name","slug"}`; `400 VALIDATION_FAILED`; `409 ORGANIZATION_SLUG_TAKEN` |
-| `GET /v1/organizations/{organizationId}/workspaces` | Workspaces da organização (`workspace:read`). | `200 {"data":[{"id","name","slug","createdAt"}]}` |
-| `POST /v1/organizations/{organizationId}/workspaces` | Cria workspace `{"name","slug"}` e registra auditoria (`workspace:create`). | `201` com o workspace; `400 VALIDATION_FAILED`; `409 WORKSPACE_SLUG_TAKEN` |
-| `GET /v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Workflows do workspace (`workflow:read`). | `200 {"data":[workflow]}`; `404 WORKSPACE_NOT_FOUND` |
-| `POST /v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Cria workflow `{"name","key","definition"}` com a versão 1 (`workflow:write`). | `201` workflow; `400 VALIDATION_FAILED`; `404 WORKSPACE_NOT_FOUND`; `409 WORKFLOW_KEY_TAKEN` |
-| `GET /v1/organizations/{organizationId}/workflows/{workflowId}` | Workflow com o resumo das versões, da mais nova para a mais antiga (`workflow:read`). | `200`; `404 WORKFLOW_NOT_FOUND` |
-| `POST /v1/organizations/{organizationId}/workflows/{workflowId}/versions` | Publica nova versão `{"definition"}` (`workflow:write`). | `201 {"workflowId","version","definition","createdBy","createdAt"}`; `404 WORKFLOW_NOT_FOUND` |
-| `PUT /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Ativa uma versão `{"version"}` (`workflow:activate`). Reativar a versão ativa não muda nada. | `200` workflow; `404 WORKFLOW_VERSION_NOT_FOUND` |
-| `DELETE /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Desativa (`workflow:activate`); idempotente. | `200` workflow com `activeVersion: null` |
-| `GET /v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}` | Uma versão com a definição completa (`workflow:read`). | `200`; `404 WORKFLOW_VERSION_NOT_FOUND` |
-| `POST /v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Inicia uma execução da versão ativa `{"input"}` (`execution:start`). Header opcional `Idempotency-Key`. | `201` execução com steps; `200` replay da mesma chave; `409 WORKFLOW_INACTIVE`; `409 IDEMPOTENCY_KEY_REUSED` |
-| `GET /v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Execuções do workflow, da mais nova para a mais antiga, com `?limit=` (1 a 100, padrão 20) e `?cursor=` (`execution:read`). | `200 {"data","nextCursor"}`; `400 VALIDATION_FAILED` |
-| `GET /v1/organizations/{organizationId}/executions/{executionId}` | Execução com os steps na ordem da definição (`execution:read`). | `200`; `404 EXECUTION_NOT_FOUND` |
+| `GET /api/v1/me` | Principal autenticado (requer `Authorization: Bearer <token>`). | `200 {"subject":"..."}`; `401 {"code":"UNAUTHENTICATED",...}` |
+| `GET /api/v1/organizations` | Organizações do usuário logado, com o papel em cada uma. | `200 {"data":[{"id","name","slug","role"}]}` |
+| `POST /api/v1/organizations` | Cria organização `{"name","slug"}`; quem cria vira `OWNER`. Cadastra o usuário no primeiro acesso. | `201 {"id","name","slug"}`; `400 VALIDATION_FAILED`; `409 ORGANIZATION_SLUG_TAKEN` |
+| `GET /api/v1/organizations/{organizationId}/workspaces` | Workspaces da organização (`workspace:read`). | `200 {"data":[{"id","name","slug","createdAt"}]}` |
+| `POST /api/v1/organizations/{organizationId}/workspaces` | Cria workspace `{"name","slug"}` e registra auditoria (`workspace:create`). | `201` com o workspace; `400 VALIDATION_FAILED`; `409 WORKSPACE_SLUG_TAKEN` |
+| `GET /api/v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Workflows do workspace (`workflow:read`). | `200 {"data":[workflow]}`; `404 WORKSPACE_NOT_FOUND` |
+| `POST /api/v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Cria workflow `{"name","key","definition"}` com a versão 1 (`workflow:write`). | `201` workflow; `400 VALIDATION_FAILED`; `404 WORKSPACE_NOT_FOUND`; `409 WORKFLOW_KEY_TAKEN` |
+| `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}` | Workflow com o resumo das versões, da mais nova para a mais antiga (`workflow:read`). | `200`; `404 WORKFLOW_NOT_FOUND` |
+| `POST /api/v1/organizations/{organizationId}/workflows/{workflowId}/versions` | Publica nova versão `{"definition"}` (`workflow:write`). | `201 {"workflowId","version","definition","createdBy","createdAt"}`; `404 WORKFLOW_NOT_FOUND` |
+| `PUT /api/v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Ativa uma versão `{"version"}` (`workflow:activate`). Reativar a versão ativa não muda nada. | `200` workflow; `404 WORKFLOW_VERSION_NOT_FOUND` |
+| `DELETE /api/v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Desativa (`workflow:activate`); idempotente. | `200` workflow com `activeVersion: null` |
+| `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}` | Uma versão com a definição completa (`workflow:read`). | `200`; `404 WORKFLOW_VERSION_NOT_FOUND` |
+| `POST /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Inicia uma execução da versão ativa `{"input"}` (`execution:start`). Header opcional `Idempotency-Key`. | `201` execução com steps; `200` replay da mesma chave; `409 WORKFLOW_INACTIVE`; `409 IDEMPOTENCY_KEY_REUSED` |
+| `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Execuções do workflow, da mais nova para a mais antiga, com `?limit=` (1 a 100, padrão 20) e `?cursor=` (`execution:read`). | `200 {"data","nextCursor"}`; `400 VALIDATION_FAILED` |
+| `GET /api/v1/organizations/{organizationId}/executions/{executionId}` | Execução com os steps na ordem da definição (`execution:read`). | `200`; `404 EXECUTION_NOT_FOUND` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
 O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
@@ -59,7 +61,7 @@ O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organiz
 - Não membro, organização inexistente ou id inválido: `404 ORGANIZATION_NOT_FOUND` (a existência de outros tenants não vaza).
 - Papel sem a permissão da rota: `403 FORBIDDEN`.
 - Deny by default: rota com `:organizationId` sem `@RequirePermission(...)` é negada; `@RequirePermission` em rota sem organização também.
-- Rotas sem organização (ex.: `/v1/me`) só exigem autenticação.
+- Rotas sem organização (ex.: `/api/v1/me`) só exigem autenticação.
 
 | Permissão | OWNER | ADMIN | DEVELOPER | OPERATOR | VIEWER |
 | --- | --- | --- | --- | --- | --- |
@@ -135,7 +137,7 @@ Drizzle ORM com migrations SQL versionadas em `migrations/` (ADR-0017).
 - Dois papéis: `operantix` é dono do schema e roda as migrations; `operantix_app` é o papel da API, sem `SUPERUSER` nem `BYPASSRLS`, com apenas `SELECT/INSERT/UPDATE/DELETE`. No compose ele é criado por `infrastructure/docker/postgres/init/10-app-role.sh` na primeira inicialização do volume.
 - Tabelas com `organization_id` têm `FORCE ROW LEVEL SECURITY` e a policy `tenant_isolation`. Sem tenant definido, nenhuma linha é visível.
 - Todo acesso a dados de tenant passa por `withTenant(db, organizationId, fn)`, que abre uma transação e faz `set_config('app.organization_id', ..., true)`. O valor vale só para a transação, então não vaza entre conexões do pool.
-- `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS. O registro é criado no primeiro `POST /v1/organizations` a partir do `sub` do token; `email` e `name` vêm do token quando presentes.
+- `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS. O registro é criado no primeiro `POST /api/v1/organizations` a partir do `sub` do token; `email` e `name` vêm do token quando presentes.
 - `withUser(db, userId, fn)` abre um escopo só de leitura em que o usuário vê as próprias memberships e as organizações a que pertence, em todos os tenants (policies `member_reads_own`, `FOR SELECT`). Escritas continuam exigindo `withTenant`.
 
 Para mudar o schema: edite `src/**/*.schema.ts`, rode `pnpm --filter @operantix/platform-api db:generate` e revise o SQL gerado. Policies e funções vão em migration custom (`drizzle-kit generate --custom`).

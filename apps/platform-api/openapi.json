@@ -160,7 +160,7 @@
         "security": []
       }
     },
-    "/v1/me": {
+    "/api/v1/me": {
       "get": {
         "summary": "The authenticated principal",
         "tags": [
@@ -225,7 +225,7 @@
         }
       }
     },
-    "/v1/organizations": {
+    "/api/v1/organizations": {
       "get": {
         "summary": "Organizations of the caller, with their role",
         "tags": [
@@ -469,7 +469,7 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/workspaces": {
+    "/api/v1/organizations/{organizationId}/workspaces": {
       "get": {
         "summary": "Workspaces of the organization",
         "tags": [
@@ -858,7 +858,7 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows": {
+    "/api/v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows": {
       "get": {
         "summary": "Workflows of a workspace",
         "tags": [
@@ -1511,7 +1511,7 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/workflows/{workflowId}": {
+    "/api/v1/organizations/{organizationId}/workflows/{workflowId}": {
       "get": {
         "summary": "A workflow with its version history, newest first",
         "tags": [
@@ -1722,7 +1722,7 @@
         ]
       }
     },
-    "/v1/organizations/{organizationId}/workflows/{workflowId}/versions": {
+    "/api/v1/organizations/{organizationId}/workflows/{workflowId}/versions": {
       "post": {
         "summary": "Publish a new immutable version",
         "tags": [
@@ -2318,7 +2318,7 @@
         }
       }
     },
-    "/v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}": {
+    "/api/v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}": {
       "get": {
         "summary": "One version with its full definition",
         "tags": [
@@ -2683,7 +2683,7 @@
         ]
       }
     },
-    "/v1/organizations/{organizationId}/workflows/{workflowId}/activation": {
+    "/api/v1/organizations/{organizationId}/workflows/{workflowId}/activation": {
       "put": {
         "summary": "Activate a version (idempotent)",
         "tags": [
@@ -3093,7 +3093,7 @@
         ]
       }
     },
-    "/v1/organizations/{organizationId}/workflows/{workflowId}/executions": {
+    "/api/v1/organizations/{organizationId}/workflows/{workflowId}/executions": {
       "post": {
         "summary": "Start an execution of the active version",
         "tags": [
@@ -4007,7 +4007,7 @@
         ]
       }
     },
-    "/v1/organizations/{organizationId}/executions/{executionId}": {
+    "/api/v1/organizations/{organizationId}/executions/{executionId}": {
       "get": {
         "summary": "An execution with its steps in definition order",
         "tags": [
