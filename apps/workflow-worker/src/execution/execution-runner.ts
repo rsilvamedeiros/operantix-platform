@@ -1,9 +1,16 @@
 import { Logger } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { type Database, type Transaction, withTenant } from '../database';
-import { executions, stepExecutions, type WorkflowStep, workflowVersions } from '../engine.schema';
+import {
+  executionJobs,
+  executions,
+  stepExecutions,
+  type WorkflowStep,
+  workflowVersions,
+} from '../engine.schema';
 import type { ClaimedJob } from '../queue/job-queue';
 import { type StepDispatcher, UnsupportedStepError } from '../steps/step-dispatcher';
+import { StepError } from '../steps/step-error';
 
 /** RESCHEDULED: a step failed with a retryable error and the job is due again later. */
 export type ExecutionOutcome = 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'RESCHEDULED';
@@ -18,7 +25,10 @@ const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 interface StepFailure {
   code: string;
   message: string;
+  retryable: boolean;
 }
+
+const MAX_RETRY_DELAY_MS = 15 * 60_000;
 
 /**
  * Drives one execution to a terminal state. Each step's result is committed before the next
@@ -105,26 +115,62 @@ export class ExecutionRunner {
           .select({ status: executions.status })
           .from(executions)
           .where(eq(executions.id, job.executionId));
-        if (row && !TERMINAL.has(row.status)) {
-          await tx
-            .update(stepExecutions)
-            .set({
-              status: 'RUNNING',
-              attempts: sql`${stepExecutions.attempts} + 1`,
-              startedAt: sql`now()`,
-            })
-            .where(eq(stepExecutions.id, step.id));
-        }
-        return row?.status;
+        if (!row || TERMINAL.has(row.status)) return { status: row?.status, attempt: 0 };
+        const [started] = await tx
+          .update(stepExecutions)
+          .set({
+            status: 'RUNNING',
+            attempts: sql`${stepExecutions.attempts} + 1`,
+            startedAt: sql`now()`,
+          })
+          .where(eq(stepExecutions.id, step.id))
+          .returning({ attempts: stepExecutions.attempts });
+        return { status: row.status, attempt: started?.attempts ?? 1 };
       });
-      if (current === undefined) return 'CANCELLED';
-      if (TERMINAL.has(current)) return current as ExecutionOutcome;
+      if (current.status === undefined) return 'CANCELLED';
+      if (TERMINAL.has(current.status)) return current.status as ExecutionOutcome;
 
       const definition = definitionSteps.get(step.stepId);
       const result = await this.runStep(definition, step.stepId, {
         ...scope,
         input: execution.input,
       });
+
+      if (
+        'failure' in result &&
+        result.failure.retryable &&
+        current.attempt < this.retry.maxStepAttempts
+      ) {
+        const delayMs = Math.min(
+          this.retry.baseDelayMs * 2 ** (current.attempt - 1),
+          MAX_RETRY_DELAY_MS,
+        );
+        this.logger.warn({
+          ...scope,
+          stepId: step.stepId,
+          code: result.failure.code,
+          attempt: current.attempt,
+          delayMs,
+          msg: 'Step failed; retry scheduled',
+        });
+        await tenant(async (tx) => {
+          await tx
+            .update(stepExecutions)
+            .set({ status: 'PENDING', error: { ...result.failure } })
+            .where(eq(stepExecutions.id, step.id));
+          // A scheduled retry is not a crash: the job's claim budget starts over.
+          await tx
+            .update(executionJobs)
+            .set({
+              runAfter: sql`now() + make_interval(secs => ${delayMs / 1000})`,
+              lockedUntil: null,
+              lockedBy: null,
+              attempts: 0,
+            })
+            .where(eq(executionJobs.id, job.id));
+        });
+        return 'RESCHEDULED';
+      }
 
       if ('failure' in result) {
         this.logger.warn({
@@ -170,19 +216,29 @@ export class ExecutionRunner {
         failure: {
           code: 'STEP_NOT_IN_DEFINITION',
           message: `Step "${stepId}" is not in the workflow version`,
+          retryable: false,
         },
       };
     }
     try {
       return { output: (await this.dispatcher.dispatch(definition, context)) ?? null };
     } catch (error) {
-      if (error instanceof UnsupportedStepError) {
-        return { failure: { code: 'STEP_TYPE_NOT_SUPPORTED', message: error.message } };
+      if (error instanceof StepError) {
+        return {
+          failure: { code: error.code, message: error.message, retryable: error.retryable },
+        };
       }
+      if (error instanceof UnsupportedStepError) {
+        return {
+          failure: { code: 'STEP_TYPE_NOT_SUPPORTED', message: error.message, retryable: false },
+        };
+      }
+      // Unclassified errors are bugs or unexpected states: fail rather than retry blindly.
       return {
         failure: {
           code: 'STEP_ERROR',
           message: error instanceof Error ? error.message : 'Step failed',
+          retryable: false,
         },
       };
     }
