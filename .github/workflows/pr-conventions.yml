@@ -1,0 +1,40 @@
+name: PR conventions
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: pr-conventions-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  conventions:
+    name: Title and branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR title (Conventional Commits)
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          pattern='^(feat|fix|docs|refactor|test|build|ci|chore|perf)(\([a-z0-9-]+\))?!?: [a-z].{0,70}[^.]$'
+          if ! printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "::error::PR title must follow Conventional Commits (docs/development/commits.md): '$TITLE'"
+            exit 1
+          fi
+
+      - name: Check branch name
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          if ! printf '%s' "$BRANCH" | grep -Eq '^(feat|fix|docs|refactor|test|build|ci|chore|perf)/[a-z0-9]+(-[a-z0-9]+)*$'; then
+            echo "::error::Branch must be <type>/<kebab-summary> (docs/development/branching.md): '$BRANCH'"
+            exit 1
+          fi
+          if printf '%s' "$BRANCH" | grep -Eiq 'claude|(^|[/-])bot([/-]|$)'; then
+            echo "::error::Branch names must not reference tools, agents or bots: '$BRANCH'"
+            exit 1
+          fi

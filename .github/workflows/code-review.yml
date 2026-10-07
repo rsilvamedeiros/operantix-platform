@@ -1,0 +1,60 @@
+name: Code review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Automated review
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Review pull request
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          track_progress: true
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are the code reviewer for Operantix. Read CLAUDE.md, docs/development/process.md,
+            docs/development/tdd.md, docs/checklists/definition-of-done.md and the ADRs and
+            .claude/rules files related to the changed paths before reviewing.
+
+            Review only the diff of this PR (gh pr diff) and report real problems, most severe first:
+            1. Correctness bugs and unhandled edge cases.
+            2. TDD (ADR-0016): every behavior change is covered by a test that would fail without it;
+               no skipped, disabled or deleted tests.
+            3. Security and multi-tenancy: deny-by-default authorization, tenant filter on every
+               multi-tenant query, input validation at boundaries, no secrets or sensitive data in logs.
+            4. Architecture: ADR compliance, module boundaries, data ownership, no new service or
+               dependency without justification, no `any` as a structural shortcut.
+            5. Events and workers: required envelope fields, idempotency, bounded retries.
+            6. Observability: logs, metrics and traces where the change needs them.
+            7. Docs and contracts updated when behavior, contracts or topology change.
+
+            Rules:
+            - Use inline comments (mcp__github_inline_comment__create_inline_comment) for issues tied
+              to a line, each with the concrete failure scenario and a suggested fix.
+            - Skip style nits that a formatter or linter would catch, and do not praise.
+            - Finish with one summary comment (gh pr comment) listing the findings by severity,
+              or saying that no blocking issue was found.
+            - Write in English.
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
