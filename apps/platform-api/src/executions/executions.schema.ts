@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   foreignKey,
   index,
   integer,
@@ -121,6 +122,32 @@ export const executionJobs = pgTable(
   },
   (t) => [
     index().on(t.runAfter),
+    foreignKey({
+      columns: [t.organizationId, t.executionId],
+      foreignColumns: [executions.organizationId, executions.id],
+    }).onDelete('cascade'),
+  ],
+);
+
+/**
+ * Append-only history of an execution, written by the API (creation) and the worker (every
+ * state change, in the same transaction as the change). The timeline API reads it in `id`
+ * order. RLS and the trigger that rejects UPDATE/DELETE live in a hand-written migration.
+ */
+export const executionEvents = pgTable(
+  'execution_events',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: uuid('organization_id').notNull(),
+    executionId: uuid('execution_id').notNull(),
+    type: text('type').notNull(),
+    stepId: text('step_id'),
+    attempt: integer('attempt'),
+    details: jsonb('details').$type<Record<string, unknown>>(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.executionId, t.id),
     foreignKey({
       columns: [t.organizationId, t.executionId],
       foreignColumns: [executions.organizationId, executions.id],

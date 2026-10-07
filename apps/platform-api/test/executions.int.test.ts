@@ -309,6 +309,19 @@ describe('executions API', () => {
         /append-only/,
       );
     });
+
+    it('goes away with its execution', async () => {
+      const id = await workflow('timeline-cascade', true);
+      const created = (await start(id, operator.sub)).body as ExecutionBody;
+
+      await database.ownerPool.query('DELETE FROM executions WHERE id = $1', [created.id]);
+
+      const { rowCount } = await database.ownerPool.query(
+        'SELECT 1 FROM execution_events WHERE execution_id = $1',
+        [created.id],
+      );
+      expect(rowCount).toBe(0);
+    });
   });
 
   it('lists executions newest first with a cursor', async () => {
