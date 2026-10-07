@@ -9,6 +9,7 @@ import { createDatabase, type Database, withTenant, withUser } from '../src/data
 import { runMigrations } from '../src/database/migrations';
 import { memberships, users } from '../src/identity/identity.schema';
 import { organizations, workspaces } from '../src/organizations/organizations.schema';
+import { endPool } from './support/end-pool';
 
 const APP_ROLE_SQL = resolve(__dirname, '../../../infrastructure/docker/postgres/app-role.sql');
 
@@ -68,8 +69,8 @@ describe('tenant isolation enforced by PostgreSQL row-level security', () => {
   });
 
   afterAll(async () => {
-    await appPool.end();
-    await ownerPool.end();
+    await endPool(appPool);
+    await endPool(ownerPool);
     await container.stop();
   });
 
