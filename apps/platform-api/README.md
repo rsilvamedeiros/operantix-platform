@@ -102,7 +102,7 @@ Workflows e versões têm RLS e chaves estrangeiras compostas com `organization_
 
 ## Execuções
 
-Iniciar uma execução congela a versão ativa (`workflowVersion`) e cria um `step_execution` `PENDING` por step, na ordem da definição. A execução nasce `PENDING`; quem a move é o worker (próxima fatia do M03). As transições válidas ficam em `src/executions/execution-state.ts`: `PENDING → RUNNING | CANCELLED` e `RUNNING → SUCCEEDED | FAILED | CANCELLED`; estados finais não mudam.
+Iniciar uma execução congela a versão ativa (`workflowVersion`) e cria um `step_execution` `PENDING` por step, na ordem da definição. A execução nasce `PENDING`, e na mesma transação entra um job em `execution_jobs` para o worker; quem a move é o `workflow-worker`. Um replay idempotente não enfileira de novo. As transições válidas ficam em `src/executions/execution-state.ts`: `PENDING → RUNNING | CANCELLED` e `RUNNING → SUCCEEDED | FAILED | CANCELLED`; estados finais não mudam.
 
 Idempotência (`docs/api/idempotency.md`): com `Idempotency-Key`, a chave é única por workflow (índice único `(organization_id, workflow_id, idempotency_key)`) e guarda o SHA-256 do body canônico. Repetir a chave com o mesmo body devolve a primeira execução com `200`; com body diferente, `409 IDEMPOTENCY_KEY_REUSED`. Requisições concorrentes com a mesma chave usam `INSERT ... ON CONFLICT DO NOTHING`, então só uma cria a execução e as outras recebem a mesma.
 
@@ -138,6 +138,7 @@ Drizzle ORM com migrations SQL versionadas em `migrations/` (ADR-0017).
 - Tabelas com `organization_id` têm `FORCE ROW LEVEL SECURITY` e a policy `tenant_isolation`. Sem tenant definido, nenhuma linha é visível.
 - Todo acesso a dados de tenant passa por `withTenant(db, organizationId, fn)`, que abre uma transação e faz `set_config('app.organization_id', ..., true)`. O valor vale só para a transação, então não vaza entre conexões do pool.
 - `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS. O registro é criado no primeiro `POST /api/v1/organizations` a partir do `sub` do token; `email` e `name` vêm do token quando presentes.
+- `operantix_worker` é o papel do `workflow-worker` (ADR-0018, ADR-0019). Ele vê a fila `execution_jobs` de todos os tenants (policy `worker_queue`), lê e atualiza execuções e steps só dentro de `withTenant` e não tem acesso às outras tabelas. A migration cria o papel sem `LOGIN`; no compose, `init/20-worker-role.sh` define `LOGIN` e senha.
 - `withUser(db, userId, fn)` abre um escopo só de leitura em que o usuário vê as próprias memberships e as organizações a que pertence, em todos os tenants (policies `member_reads_own`, `FOR SELECT`). Escritas continuam exigindo `withTenant`.
 
 Para mudar o schema: edite `src/**/*.schema.ts`, rode `pnpm --filter @operantix/platform-api db:generate` e revise o SQL gerado. Policies e funções vão em migration custom (`drizzle-kit generate --custom`).

@@ -128,6 +128,35 @@ describe('executions API', () => {
     });
   });
 
+  const jobsOf = async (executionId: string) =>
+    (
+      await database.ownerPool.query<{ organization_id: string; attempts: number }>(
+        'SELECT organization_id, attempts FROM execution_jobs WHERE execution_id = $1',
+        [executionId],
+      )
+    ).rows;
+
+  it('enqueues one job for the worker in the same transaction as the execution', async () => {
+    const id = await workflow('queued', true);
+
+    const res = await start(id, operator.sub);
+
+    expect(res.status).toBe(201);
+    expect(await jobsOf((res.body as ExecutionBody).id)).toEqual([
+      { organization_id: acme, attempts: 0 },
+    ]);
+  });
+
+  it('does not enqueue again when a request is replayed', async () => {
+    const id = await workflow('queued-replay', true);
+    const first = await start(id, operator.sub, {}, 'replay-queue');
+
+    const replay = await start(id, operator.sub, {}, 'replay-queue');
+
+    expect(replay.status).toBe(200);
+    expect(await jobsOf((first.body as ExecutionBody).id)).toHaveLength(1);
+  });
+
   it('refuses to start an inactive workflow', async () => {
     const id = await workflow('inactive', false);
 
