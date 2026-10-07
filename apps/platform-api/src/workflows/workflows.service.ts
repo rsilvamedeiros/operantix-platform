@@ -143,6 +143,45 @@ export class WorkflowsService {
     });
   }
 
+  /** Makes `version` the one new executions use. Re-activating the active version is a no-op. */
+  activate(tenant: TenantContext, workflowId: string, version: number): Promise<WorkflowView> {
+    return withTenant(this.db, tenant.organizationId, async (tx) => {
+      const current = await lockWorkflow(tx, workflowId);
+      if (current.activeVersion === version) return current;
+      const [exists] = await tx
+        .select({ version: workflowVersions.version })
+        .from(workflowVersions)
+        .where(
+          and(eq(workflowVersions.workflowId, workflowId), eq(workflowVersions.version, version)),
+        );
+      if (!exists) throw new WorkflowVersionNotFoundError(`${workflowId}@${String(version)}`);
+      const updated = await setActiveVersion(tx, workflowId, version);
+      await recordAudit(tx, tenant, {
+        action: 'workflow.activated',
+        resourceType: 'workflow',
+        resourceId: workflowId,
+        metadata: { version, previousVersion: current.activeVersion },
+      });
+      return updated;
+    });
+  }
+
+  /** Stops new executions from starting. Deactivating an inactive workflow is a no-op. */
+  deactivate(tenant: TenantContext, workflowId: string): Promise<WorkflowView> {
+    return withTenant(this.db, tenant.organizationId, async (tx) => {
+      const current = await lockWorkflow(tx, workflowId);
+      if (current.activeVersion === null) return current;
+      const updated = await setActiveVersion(tx, workflowId, null);
+      await recordAudit(tx, tenant, {
+        action: 'workflow.deactivated',
+        resourceType: 'workflow',
+        resourceId: workflowId,
+        metadata: { previousVersion: current.activeVersion },
+      });
+      return updated;
+    });
+  }
+
   getVersion(
     tenant: TenantContext,
     workflowId: string,
@@ -167,6 +206,31 @@ async function requireWorkspace(tx: Transaction, workspaceId: string): Promise<v
     .from(workspaces)
     .where(eq(workspaces.id, workspaceId));
   if (!workspace) throw new WorkspaceNotFoundError(workspaceId);
+}
+
+/** Reads the workflow under a row lock, so concurrent activations apply one after another. */
+async function lockWorkflow(tx: Transaction, workflowId: string): Promise<WorkflowView> {
+  const [workflow] = await tx
+    .select(workflowView)
+    .from(workflows)
+    .where(eq(workflows.id, workflowId))
+    .for('update');
+  if (!workflow) throw new WorkflowNotFoundError(workflowId);
+  return workflow;
+}
+
+async function setActiveVersion(
+  tx: Transaction,
+  workflowId: string,
+  version: number | null,
+): Promise<WorkflowView> {
+  const [updated] = await tx
+    .update(workflows)
+    .set({ activeVersion: version })
+    .where(eq(workflows.id, workflowId))
+    .returning(workflowView);
+  if (!updated) throw new Error('Workflow update returned no row');
+  return updated;
 }
 
 async function insertVersion(

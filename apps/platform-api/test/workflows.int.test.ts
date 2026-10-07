@@ -37,6 +37,7 @@ describe('workflows API', () => {
   const globexProduction = randomUUID();
   const developer = { id: randomUUID(), sub: 'auth|dev' };
   const viewer = { id: randomUUID(), sub: 'auth|viewer' };
+  const operator = { id: randomUUID(), sub: 'auth|operator' };
   const outsider = { id: randomUUID(), sub: 'auth|outsider' };
 
   beforeAll(async () => {
@@ -53,10 +54,13 @@ describe('workflows API', () => {
     ]);
     await owner
       .insert(users)
-      .values([developer, viewer, outsider].map((u) => ({ id: u.id, authSubject: u.sub })));
+      .values(
+        [developer, viewer, operator, outsider].map((u) => ({ id: u.id, authSubject: u.sub })),
+      );
     await owner.insert(memberships).values([
       { organizationId: acme, userId: developer.id, role: 'DEVELOPER' },
       { organizationId: acme, userId: viewer.id, role: 'VIEWER' },
+      { organizationId: acme, userId: operator.id, role: 'OPERATOR' },
       { organizationId: globex, userId: outsider.id, role: 'OWNER' },
     ]);
 
@@ -245,6 +249,141 @@ describe('workflows API', () => {
     expect(read.status).toBe(404);
     expect(write.status).toBe(404);
     expect(write.body).toMatchObject({ code: 'WORKFLOW_NOT_FOUND' });
+  });
+
+  describe('activation', () => {
+    const activationOf = (id: string, org: string = acme) =>
+      `/v1/organizations/${org}/workflows/${id}/activation`;
+
+    const workflowWithTwoVersions = async (key: string): Promise<string> => {
+      const created = await createWorkflow(developer.sub, key);
+      const { id } = created.body as WorkflowBody;
+      await request(httpServer(app))
+        .post(`/v1/organizations/${acme}/workflows/${id}/versions`)
+        .set('Authorization', await as(developer.sub))
+        .send({ definition: definition('second') });
+      return id;
+    };
+
+    it('activates a version, switches to another and deactivates, auditing each change', async () => {
+      const id = await workflowWithTwoVersions('to-activate');
+      const auth = await as(operator.sub);
+
+      const first = await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', auth)
+        .send({ version: 1 });
+      const second = await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', auth)
+        .send({ version: 2 });
+      const off = await request(httpServer(app))
+        .delete(activationOf(id))
+        .set('Authorization', auth);
+
+      expect(first.status).toBe(200);
+      expect(first.body).toMatchObject({ id, activeVersion: 1 });
+      expect(second.body).toMatchObject({ activeVersion: 2 });
+      expect(off.status).toBe(200);
+      expect(off.body).toMatchObject({ activeVersion: null });
+
+      const { rows } = await database.ownerPool.query(
+        `SELECT action, metadata FROM audit_entries
+         WHERE resource_id = $1 AND action LIKE 'workflow.%activated' ORDER BY occurred_at`,
+        [id],
+      );
+      expect(rows).toEqual([
+        { action: 'workflow.activated', metadata: { version: 1, previousVersion: null } },
+        { action: 'workflow.activated', metadata: { version: 2, previousVersion: 1 } },
+        { action: 'workflow.deactivated', metadata: { previousVersion: 2 } },
+      ]);
+    });
+
+    it('treats deactivating an inactive workflow as a no-op without an audit entry', async () => {
+      const id = await workflowWithTwoVersions('never-active');
+
+      const res = await request(httpServer(app))
+        .delete(activationOf(id))
+        .set('Authorization', await as(operator.sub));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ activeVersion: null });
+      const { rows } = await database.ownerPool.query(
+        "SELECT 1 FROM audit_entries WHERE resource_id = $1 AND action = 'workflow.deactivated'",
+        [id],
+      );
+      expect(rows).toEqual([]);
+    });
+
+    it('answers 404 when activating a version that does not exist', async () => {
+      const id = await workflowWithTwoVersions('missing-version');
+
+      const res = await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', await as(operator.sub))
+        .send({ version: 7 });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ code: 'WORKFLOW_VERSION_NOT_FOUND' });
+    });
+
+    it('rejects an invalid activation body', async () => {
+      const id = await workflowWithTwoVersions('bad-body');
+
+      const res = await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', await as(operator.sub))
+        .send({ version: 'latest' });
+
+      expect(res.status).toBe(400);
+    });
+
+    it('forbids a viewer from activating', async () => {
+      const id = await workflowWithTwoVersions('viewer-activation');
+
+      const res = await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', await as(viewer.sub))
+        .send({ version: 1 });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('does not let another organization activate the workflow', async () => {
+      const id = await workflowWithTwoVersions('foreign-activation');
+
+      const res = await request(httpServer(app))
+        .put(activationOf(id, globex))
+        .set('Authorization', await as(outsider.sub))
+        .send({ version: 1 });
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ code: 'WORKFLOW_NOT_FOUND' });
+    });
+
+    it('still lets an active workflow be removed with its versions', async () => {
+      const id = await workflowWithTwoVersions('removable');
+      await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', await as(operator.sub))
+        .send({ version: 2 });
+
+      await database.ownerPool.query('DELETE FROM workflows WHERE id = $1', [id]);
+
+      const { rows } = await database.ownerPool.query(
+        'SELECT count(*)::int AS n FROM workflow_versions WHERE workflow_id = $1',
+        [id],
+      );
+      expect(rows).toEqual([{ n: 0 }]);
+    });
+
+    it('refuses at the database level to point at a version that does not exist', async () => {
+      const id = await workflowWithTwoVersions('db-guard');
+
+      await expect(
+        database.ownerPool.query('UPDATE workflows SET active_version = 99 WHERE id = $1', [id]),
+      ).rejects.toThrow(/foreign key/);
+    });
   });
 
   it('keeps published versions immutable', async () => {

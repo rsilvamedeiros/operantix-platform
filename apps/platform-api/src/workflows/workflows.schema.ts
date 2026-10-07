@@ -42,6 +42,8 @@ export const workflows = pgTable(
     }).onDelete('cascade'),
   ],
 );
+// workflows.(id, active_version) -> workflow_versions.(workflow_id, version) closes a cycle with
+// the versions' foreign key above, so it lives in a hand-written migration (0008).
 
 export const workflowVersions = pgTable(
   'workflow_versions',
