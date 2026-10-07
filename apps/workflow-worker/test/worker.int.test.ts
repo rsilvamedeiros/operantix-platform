@@ -94,6 +94,13 @@ describe('workflow worker against PostgreSQL', () => {
         [id],
       )
     ).rows;
+  const timeline = async (id: string) =>
+    (
+      await database.owner.query<{ type: string; step_id: string | null; attempt: number | null }>(
+        'SELECT type, step_id, attempt FROM execution_events WHERE execution_id = $1 ORDER BY id',
+        [id],
+      )
+    ).rows.map((e) => [e.type, e.step_id, e.attempt]);
   const jobCount = async (id: string) =>
     (await database.owner.query('SELECT 1 FROM execution_jobs WHERE execution_id = $1', [id]))
       .rowCount;
@@ -126,6 +133,37 @@ describe('workflow worker against PostgreSQL', () => {
       },
     ]);
     expect(await jobCount(seeded.executionId)).toBe(0);
+  });
+
+  it('records the timeline of a run', async () => {
+    const seeded = await database.seedExecution([log('first'), log('second')]);
+
+    await loop.tick();
+
+    expect(await timeline(seeded.executionId)).toEqual([
+      ['execution.started', null, null],
+      ['step.started', 'first', 1],
+      ['step.succeeded', 'first', 1],
+      ['step.started', 'second', 1],
+      ['step.succeeded', 'second', 1],
+      ['execution.succeeded', null, null],
+    ]);
+  });
+
+  it('records failures and skipped steps in the timeline', async () => {
+    const seeded = await database.seedExecution([
+      { id: 'call', name: 'Call', type: 'refuse', config: {} },
+      log('never'),
+    ]);
+
+    await loop.tick();
+
+    expect(await timeline(seeded.executionId)).toEqual([
+      ['execution.started', null, null],
+      ['step.started', 'call', 1],
+      ['step.failed', 'call', 1],
+      ['execution.failed', null, null],
+    ]);
   });
 
   it('fails the execution on a step it cannot run and skips the rest', async () => {
@@ -252,6 +290,14 @@ describe('workflow worker against PostgreSQL', () => {
       ]);
       expect(await execution(seeded.executionId)).toMatchObject({ status: 'SUCCEEDED' });
       expect(await jobCount(seeded.executionId)).toBe(0);
+      expect((await timeline(seeded.executionId)).slice(3)).toEqual([
+        ['step.started', 'call', 1],
+        ['step.failed', 'call', 1],
+        ['step.retry_scheduled', 'call', 1],
+        ['step.started', 'call', 2],
+        ['step.succeeded', 'call', 2],
+        ['execution.succeeded', null, null],
+      ]);
     });
 
     it('fails the execution once the step runs out of attempts', async () => {
@@ -329,6 +375,16 @@ describe('workflow worker against PostgreSQL', () => {
       { step_id: 'after', status: 'SUCCEEDED', attempts: 1 },
     ]);
     expect(await execution(seeded.executionId)).toMatchObject({ status: 'SUCCEEDED' });
+    expect(await timeline(seeded.executionId)).toEqual([
+      ['execution.started', null, null],
+      ['step.started', 'wait', 1],
+      ['step.waiting', 'wait', 1],
+      ['step.resumed', 'wait', 1],
+      ['step.succeeded', 'wait', 1],
+      ['step.started', 'after', 1],
+      ['step.succeeded', 'after', 1],
+      ['execution.succeeded', null, null],
+    ]);
   });
 
   it('resumes an execution a crashed worker left half done', async () => {

@@ -128,6 +128,7 @@ describe('API responses match the OpenAPI contract', () => {
     const executionId = (execution.body as { id: string }).id;
     await call('get', `${base}/workflows/{workflowId}/executions`, ids);
     await call('get', `${base}/executions/{executionId}`, { ...ids, executionId });
+    await call('get', `${base}/executions/{executionId}/timeline`, { ...ids, executionId });
 
     // The worker parks a delay step as WAITING; the API must document that state.
     await database.ownerPool.query(

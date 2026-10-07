@@ -120,6 +120,28 @@ describe('worker database role', () => {
     }
   });
 
+  it('records execution events inside a tenant scope, but cannot read them back', async () => {
+    const client = await worker.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SELECT set_config('app.organization_id', $1, true)`, [acme]);
+      await client.query(
+        `INSERT INTO execution_events (organization_id, execution_id, type) VALUES ($1, $2, 'execution.started')`,
+        [acme, executionOf[acme]],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    await expect(worker.query('SELECT 1 FROM execution_events')).rejects.toMatchObject({
+      code: '42501',
+    });
+  });
+
   it('cannot create executions or jobs', async () => {
     await expect(
       worker.query('INSERT INTO execution_jobs (organization_id, execution_id) VALUES ($1, $2)', [
