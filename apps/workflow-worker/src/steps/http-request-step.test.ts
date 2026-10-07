@@ -24,6 +24,10 @@ describe('HttpRequestStep', () => {
       res.end(JSON.stringify({ ok: true }));
     },
     '/text': (res) => res.end('plain answer'),
+    '/badjson': (res) => {
+      res.setHeader('content-type', 'application/json');
+      res.end('{not json');
+    },
     '/big': (res) => res.end('x'.repeat(5_000)),
     '/missing': (res) => {
       res.statusCode = 404;
@@ -117,6 +121,28 @@ describe('HttpRequestStep', () => {
     await expect(local.run(step({ method: 'GET', url: `${base}/text` }), context)).resolves.toEqual(
       { status: 200, body: 'plain answer' },
     );
+  });
+
+  it('keeps a body declared as JSON that does not parse as text', async () => {
+    await expect(
+      local.run(step({ method: 'GET', url: `${base}/badjson` }), context),
+    ).resolves.toEqual({ status: 200, body: '{not json' });
+  });
+
+  it('resolves host names when the policy allows the address', async () => {
+    const port = new URL(base).port;
+
+    await expect(
+      local.run(step({ method: 'GET', url: `http://localhost:${port}/text` }), context),
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  it('fails permanently on a host name that does not resolve', async () => {
+    const error = await failure(
+      local.run(step({ method: 'GET', url: 'http://operantix-missing.invalid/' }), context),
+    );
+
+    expect(error).toMatchObject({ code: 'HTTP_CONNECTION_FAILED', retryable: false });
   });
 
   it('truncates a response larger than the limit', async () => {
