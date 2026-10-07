@@ -49,4 +49,10 @@ Spike descartável, boilerplate/configuração sem lógica e infraestrutura decl
 
 ## Ferramentas
 
-Definidas no módulo M00 e registradas aqui quando decididas (runner de testes TypeScript, Testcontainers, pytest, ferramenta de cobertura e de mutation testing). Qualquer nova dependência de teste segue `docs/development/dependencies.md`.
+- **TypeScript:** Vitest (com SWC para preservar metadata de decorators do Nest) e Supertest para testes de API.
+- **Integração:** Testcontainers com as mesmas imagens do `compose.yaml` (PostgreSQL 17, Redis 7). Testes unitários ficam em `src/**/*.test.ts`; os de integração em `test/**/*.int.test.ts`.
+- **Cobertura:** `@vitest/coverage-v8`, piso de 80% (linhas, branches, funções e statements) por app.
+- **Python:** pytest, quando o `ai-service` entrar.
+- **Mutation testing:** ainda não adotado; reavaliar quando houver regras de domínio relevantes.
+
+Qualquer nova dependência de teste segue `docs/development/dependencies.md`.

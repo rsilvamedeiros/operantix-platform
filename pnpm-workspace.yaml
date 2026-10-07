@@ -1,3 +1,11 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
+
+# Install scripts we don't need: SWC ships prebuilt binaries via optional deps,
+# and the native ssh2/cpu-features/protobufjs builds are optional for Testcontainers.
+ignoredBuiltDependencies:
+  - '@swc/core'
+  - cpu-features
+  - protobufjs
+  - ssh2

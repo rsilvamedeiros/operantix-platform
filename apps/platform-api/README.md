@@ -1,3 +1,42 @@
 # Platform API
 
 NestJS API principal e core modular transacional.
+
+## Rodar localmente
+
+```bash
+docker compose up -d          # PostgreSQL e Redis
+cp .env.example .env          # na raiz; ajuste DATABASE_PASSWORD para operantix-local
+pnpm install
+pnpm --filter @operantix/platform-api build
+set -a && . ./.env && set +a && pnpm --filter @operantix/platform-api start
+```
+
+## Endpoints
+
+| Endpoint | Uso | Resposta |
+| --- | --- | --- |
+| `GET /health/live` | Liveness: o processo responde. Não consulta dependências. | `200 {"status":"ok"}` |
+| `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
+
+O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
+
+## Configuração
+
+Validada na inicialização (`src/config/config.ts`); variável ausente ou inválida derruba o processo com uma mensagem que nomeia a variável sem expor o valor.
+
+| Variável | Padrão |
+| --- | --- |
+| `NODE_ENV` | `development` |
+| `PORT` | `3000` |
+| `DATABASE_HOST`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD` | obrigatórias |
+| `DATABASE_PORT` | `5432` |
+| `REDIS_HOST` | obrigatória |
+| `REDIS_PORT` | `6379` |
+| `HEALTH_CHECK_TIMEOUT_MS` | `2000` |
+
+## Testes
+
+- `pnpm --filter @operantix/platform-api test`: unitários (sem infraestrutura).
+- `pnpm --filter @operantix/platform-api test:integration`: integração com PostgreSQL e Redis reais via Testcontainers (requer Docker).
+- `pnpm --filter @operantix/platform-api test:coverage`: os dois, com piso de 80%.

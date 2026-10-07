@@ -1,0 +1,6 @@
+# Docs are hand-formatted; Prettier covers code and config only.
+*.md
+pnpm-lock.yaml
+dist/
+coverage/
+.turbo/
