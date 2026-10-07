@@ -16,3 +16,5 @@ pnpm test:integration     # usa Testcontainers, não depende do compose
 ```
 
 Como subir cada app: README do app (ex.: `apps/platform-api/README.md`).
+
+O volume do PostgreSQL cria o papel `operantix_app` só na primeira inicialização. Se o volume é anterior a esse script, recrie com `docker compose down -v && docker compose up -d`.
