@@ -26,3 +26,16 @@ export function withTenant<T>(
     return fn(tx);
   });
 }
+
+const UNIQUE_VIOLATION = '23505';
+
+/** Whether `error` (as thrown by Drizzle, which wraps the driver error) is a unique violation. */
+export function isUniqueViolation(error: unknown): boolean {
+  const cause = error instanceof Error ? error.cause : undefined;
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === UNIQUE_VIOLATION
+  );
+}
