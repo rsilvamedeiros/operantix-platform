@@ -25,6 +25,11 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 | `WORKER_BATCH_SIZE` | `5` (máx. 100) |
 | `WORKER_POLL_INTERVAL_MS` | `1000` |
 | `WORKER_LEASE_SECONDS` | `60` |
+| `WORKER_HTTP_TIMEOUT_MS` | `10000`; precisa ser menor que o lease |
+| `WORKER_HTTP_ALLOW_PRIVATE_NETWORKS` | `false`; `true` é recusado com `NODE_ENV=production` |
+| `WORKER_HTTP_MAX_RESPONSE_BYTES` | `65536` (máx. 1 MiB) |
+| `WORKER_STEP_MAX_ATTEMPTS` | `3` (máx. 10) |
+| `WORKER_RETRY_BASE_DELAY_MS` | `2000` |
 
 ## Como funciona
 
@@ -34,12 +39,20 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 
 Regras:
 
-- Step com falha: o step fica `FAILED` com `error.code` (`STEP_TYPE_NOT_SUPPORTED`, `STEP_ERROR`, `STEP_NOT_IN_DEFINITION`), os seguintes ficam `SKIPPED` e a execução fica `FAILED` com `{code: 'STEP_FAILED', stepId}`.
+- Falha retentável (`retryable: true`: timeout, conexão recusada, `408/425/429/5xx`): enquanto o step tiver tentativas (`WORKER_STEP_MAX_ATTEMPTS`), ele volta a `PENDING` com o erro registrado e o job é reagendado com backoff exponencial (`WORKER_RETRY_BASE_DELAY_MS × 2^(tentativa-1)`, até 15 min). O reagendamento zera o contador de claims do job, que só conta crashes.
+- Falha permanente, ou retentável sem tentativas restantes: o step fica `FAILED` com `error.code` (ex.: `HTTP_STATUS`, `DESTINATION_BLOCKED`, `STEP_TYPE_NOT_SUPPORTED`, `STEP_ERROR`), os seguintes ficam `SKIPPED` e a execução fica `FAILED` com `{code: 'STEP_FAILED', stepId}`. Erro não classificado é tratado como permanente.
 - Job com mais claims que `max_attempts` (padrão 5): a execução fica `FAILED` com `MAX_ATTEMPTS_EXCEEDED`. Isso evita que uma execução que derruba o worker seja tentada para sempre.
 - Execução cancelada: o worker para antes do próximo step.
 - Shutdown (`SIGTERM`/`SIGINT`): para de buscar jobs e termina o lote em andamento.
 
-Tipos de step suportados hoje: `log`. `http_request` (com política de destino contra SSRF), `delay` e a classificação de erros para retry entram nas próximas fatias do M03.
+## Steps
+
+- `log`: a saída é `{message}`.
+- `http_request`: uma chamada; a saída é `{status, body}` (JSON quando o `content-type` é JSON, senão texto; `truncated: true` acima de `WORKER_HTTP_MAX_RESPONSE_BYTES`). Envia `Idempotency-Key: <executionId>:<stepId>`, estável entre tentativas, para o destino descartar duplicatas. Não segue redirects (`HTTP_REDIRECT_NOT_FOLLOWED`). Mensagens de erro nunca incluem o corpo da resposta, porque qualquer papel do tenant lê os erros dos steps.
+
+Política de destino (SSRF, `src/net/destination-policy.ts`): loopback, redes privadas, link-local (inclui metadata de cloud `169.254.169.254`), CGNAT, multicast e faixas reservadas são recusados com `DESTINATION_BLOCKED`, em IPv4, IPv6 e IPv4 mapeado em IPv6. A checagem roda sobre o endereço resolvido no momento da conexão (hook de `lookup`), então um nome que passa a resolver para um IP privado (DNS rebinding) também é recusado. IPs literais são checados antes de conectar. Em produção, a política não pode ser desligada; egress controlado por rede continua recomendado (`docs/security`).
+
+`delay` entra na próxima fatia do M03.
 
 ## Dados
 
