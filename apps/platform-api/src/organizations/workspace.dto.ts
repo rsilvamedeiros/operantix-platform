@@ -1,7 +1,5 @@
 import { z } from 'zod';
-
-// Lowercase letters, digits and inner hyphens; 1 to 63 characters (DNS label rules).
-const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+import { SLUG } from '../shared/slug';
 
 export const createWorkspaceSchema = z.object({
   name: z.string().trim().min(1).max(100),
