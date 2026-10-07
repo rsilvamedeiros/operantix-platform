@@ -15,6 +15,8 @@ import { AuthorizationGuard } from './authorization/authorization.guard';
 import type { AppConfig } from './config/config';
 import { createDatabase, type Database } from './database/database';
 import { DATABASE } from './database/database.tokens';
+import { ExecutionsController } from './executions/executions.controller';
+import { ExecutionsService } from './executions/executions.service';
 import { HealthController } from './health/health.controller';
 import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
@@ -53,6 +55,7 @@ export const CONTROLLERS = [
   OrganizationsController,
   WorkspacesController,
   WorkflowsController,
+  ExecutionsController,
   OpenApiController,
 ];
 
@@ -98,6 +101,7 @@ export class AppModule {
         { provide: APP_GUARD, useClass: AuthorizationGuard },
         OrganizationsService,
         WorkspacesService,
+        ExecutionsService,
         WorkflowsService,
         ConnectionsLifecycle,
       ],
