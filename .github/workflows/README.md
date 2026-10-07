@@ -2,10 +2,11 @@
 
 | Workflow | Quando roda | O que faz |
 | --- | --- | --- |
+| `ci.yml` | Todo PR e push na `main` | Format, lint, typecheck, build e testes (unit + integração com Testcontainers) com piso de cobertura. |
 | `pr-conventions.yml` | Todo PR | Valida o título do PR (Conventional Commits) e o nome da branch (`docs/development/branching.md`). |
 | `code-review.yml` | PR aberto, atualizado ou marcado como pronto (não roda em draft) | Revisão automática do diff com Claude Code, com comentários inline e um resumo no PR. |
 
-Lint, format, typecheck, testes e build entram no M00 junto com o primeiro workspace instalável, e evoluem por workload/path.
+Os gates evoluem por workload/path conforme novos apps entram no workspace.
 
 ## Segredos
 
