@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { z } from 'zod';
+import { errorMessage } from '../shared/error-message';
 import { runMigrations } from './migrations';
 
 // Separate credentials on purpose: migrations need the schema owner, while the API runs
@@ -36,6 +37,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  Logger.error(error instanceof Error ? error.message : String(error), 'Migrate');
+  Logger.error(errorMessage(error), 'Migrate');
   process.exit(1);
 });
