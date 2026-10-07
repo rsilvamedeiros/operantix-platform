@@ -1,9 +1,12 @@
 import { BadRequestException, type PipeTransform } from '@nestjs/common';
 import type { z } from 'zod';
 
-/** Validates a request body against a zod schema; failures name the fields, not the values. */
+/** Validates request input against a zod schema; failures name the fields, not the values. */
 export class ZodValidationPipe<T extends z.ZodType> implements PipeTransform<unknown, z.output<T>> {
-  constructor(private readonly schema: T) {}
+  constructor(
+    private readonly schema: T,
+    private readonly message = 'Request body is invalid',
+  ) {}
 
   transform(value: unknown): z.output<T> {
     const result = this.schema.safeParse(value);
@@ -11,7 +14,7 @@ export class ZodValidationPipe<T extends z.ZodType> implements PipeTransform<unk
     const fields = [...new Set(result.error.issues.map((issue) => issue.path.join('.')))];
     throw new BadRequestException({
       code: 'VALIDATION_FAILED',
-      message: 'Request body is invalid',
+      message: this.message,
       details: { fields },
     });
   }

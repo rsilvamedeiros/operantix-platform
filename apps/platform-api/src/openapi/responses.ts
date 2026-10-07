@@ -67,3 +67,39 @@ export const workflowVersionResponse = versionSummary.extend({
   workflowId: z.uuid(),
   definition: workflowDefinitionSchema,
 });
+
+const executionStatus = z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED']);
+
+export const executionResponse = z.object({
+  id: z.uuid(),
+  workflowId: z.uuid(),
+  workflowVersion: z.int().min(1),
+  status: executionStatus,
+  triggerType: z.string(),
+  triggeredBy: z.uuid().nullable(),
+  input: z.record(z.string(), z.unknown()),
+  error: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: timestamp,
+  startedAt: timestamp.nullable(),
+  finishedAt: timestamp.nullable(),
+});
+
+const stepExecutionResponse = z.object({
+  stepId: z.string(),
+  position: z.int().min(0),
+  status: z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'SKIPPED']),
+  attempts: z.int().min(0),
+  output: z.unknown(),
+  error: z.record(z.string(), z.unknown()).nullable(),
+  startedAt: timestamp.nullable(),
+  finishedAt: timestamp.nullable(),
+});
+
+export const executionDetailResponse = executionResponse.extend({
+  steps: z.array(stepExecutionResponse),
+});
+
+export const executionPageResponse = z.object({
+  data: z.array(executionResponse),
+  nextCursor: z.string().nullable(),
+});

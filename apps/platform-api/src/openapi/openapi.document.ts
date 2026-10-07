@@ -7,6 +7,7 @@ import {
   createWorkflowSchema,
   createWorkflowVersionSchema,
 } from '../workflows/workflow.dto';
+import { startExecutionSchema } from '../executions/execution.dto';
 import * as responses from './responses';
 
 type Method = 'get' | 'post' | 'put' | 'delete';
@@ -17,6 +18,13 @@ interface Response {
   schema: z.ZodType;
 }
 
+interface Parameter {
+  name: string;
+  in: 'query' | 'header';
+  description: string;
+  schema: Record<string, unknown>;
+}
+
 interface Operation {
   method: Method;
   path: string;
@@ -24,6 +32,8 @@ interface Operation {
   tag: string;
   access: Access;
   request?: z.ZodType;
+  /** Query and header parameters; path parameters are derived from the path. */
+  parameters?: Parameter[];
   responses: Record<string, Response>;
 }
 
@@ -179,6 +189,67 @@ const OPERATIONS: Operation[] = [
     access: 'workflow:activate',
     responses: { '200': ok('Workflow', responses.workflowResponse) },
   },
+  {
+    method: 'post',
+    path: `${ORG}/workflows/{workflowId}/executions`,
+    summary: 'Start an execution of the active version',
+    tag: 'executions',
+    access: 'execution:start',
+    request: startExecutionSchema,
+    parameters: [
+      {
+        name: 'Idempotency-Key',
+        in: 'header',
+        description:
+          'Retries with the same key and body return the first execution (200) instead of starting another',
+        schema: { type: 'string', minLength: 1, maxLength: 200, pattern: '^[\\x21-\\x7e]+$' },
+      },
+    ],
+    responses: {
+      '201': ok('Started', responses.executionDetailResponse),
+      '200': ok(
+        'Replay of an earlier request with the same key',
+        responses.executionDetailResponse,
+      ),
+      '400': invalidBody,
+      '409': error(
+        '`WORKFLOW_INACTIVE` (no active version) or `IDEMPOTENCY_KEY_REUSED` (same key, different body)',
+      ),
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/workflows/{workflowId}/executions`,
+    summary: 'Executions of a workflow, newest first',
+    tag: 'executions',
+    access: 'execution:read',
+    parameters: [
+      {
+        name: 'limit',
+        in: 'query',
+        description: 'Page size',
+        schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+      },
+      {
+        name: 'cursor',
+        in: 'query',
+        description: '`nextCursor` of the previous page',
+        schema: { type: 'string' },
+      },
+    ],
+    responses: {
+      '200': ok('A page of executions', responses.executionPageResponse),
+      '400': error('`VALIDATION_FAILED`: invalid `limit` or `cursor`'),
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/executions/{executionId}`,
+    summary: 'An execution with its steps in definition order',
+    tag: 'executions',
+    access: 'execution:read',
+    responses: { '200': ok('Execution', responses.executionDetailResponse) },
+  },
 ];
 
 function responsesFor(operation: Operation): Record<string, Response> {
@@ -220,13 +291,16 @@ export interface OpenApiDocument {
 export function buildOpenApiDocument(): OpenApiDocument {
   const paths: OpenApiDocument['paths'] = {};
   for (const operation of OPERATIONS) {
-    const parameters = [...operation.path.matchAll(/\{(\w+)\}/g)].map(([, name]) => ({
-      name,
-      in: 'path',
-      required: true,
-      schema:
-        name === 'version' ? { type: 'integer', minimum: 1 } : { type: 'string', format: 'uuid' },
-    }));
+    const parameters: unknown[] = [
+      ...[...operation.path.matchAll(/\{(\w+)\}/g)].map(([, name]) => ({
+        name,
+        in: 'path',
+        required: true,
+        schema:
+          name === 'version' ? { type: 'integer', minimum: 1 } : { type: 'string', format: 'uuid' },
+      })),
+      ...(operation.parameters ?? []).map((parameter) => ({ ...parameter, required: false })),
+    ];
     const entry: OpenApiOperation = {
       summary: operation.summary,
       tags: [operation.tag],

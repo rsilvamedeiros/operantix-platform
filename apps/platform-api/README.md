@@ -31,6 +31,9 @@ pnpm --filter @operantix/platform-api start
 | `PUT /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Ativa uma versão `{"version"}` (`workflow:activate`). Reativar a versão ativa não muda nada. | `200` workflow; `404 WORKFLOW_VERSION_NOT_FOUND` |
 | `DELETE /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Desativa (`workflow:activate`); idempotente. | `200` workflow com `activeVersion: null` |
 | `GET /v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}` | Uma versão com a definição completa (`workflow:read`). | `200`; `404 WORKFLOW_VERSION_NOT_FOUND` |
+| `POST /v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Inicia uma execução da versão ativa `{"input"}` (`execution:start`). Header opcional `Idempotency-Key`. | `201` execução com steps; `200` replay da mesma chave; `409 WORKFLOW_INACTIVE`; `409 IDEMPOTENCY_KEY_REUSED` |
+| `GET /v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Execuções do workflow, da mais nova para a mais antiga, com `?limit=` (1 a 100, padrão 20) e `?cursor=` (`execution:read`). | `200 {"data","nextCursor"}`; `400 VALIDATION_FAILED` |
+| `GET /v1/organizations/{organizationId}/executions/{executionId}` | Execução com os steps na ordem da definição (`execution:read`). | `200`; `404 EXECUTION_NOT_FOUND` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
 O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
@@ -65,6 +68,8 @@ O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organiz
 | `workflow:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `workflow:write` | ✓ | ✓ | ✓ | | |
 | `workflow:activate` | ✓ | ✓ | ✓ | ✓ | |
+| `execution:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `execution:start` | ✓ | ✓ | ✓ | ✓ | |
 
 A matriz fica em `src/authorization/permissions.ts`.
 
@@ -92,6 +97,14 @@ Definição (`src/workflows/workflow-definition.ts`, `schemaVersion: 1`):
 - Propriedades desconhecidas são rejeitadas, para erro de digitação não passar em silêncio.
 
 Workflows e versões têm RLS e chaves estrangeiras compostas com `organization_id`, então uma linha nunca aponta para o pai de outro tenant (FK comum é checada sem RLS).
+
+## Execuções
+
+Iniciar uma execução congela a versão ativa (`workflowVersion`) e cria um `step_execution` `PENDING` por step, na ordem da definição. A execução nasce `PENDING`; quem a move é o worker (próxima fatia do M03). As transições válidas ficam em `src/executions/execution-state.ts`: `PENDING → RUNNING | CANCELLED` e `RUNNING → SUCCEEDED | FAILED | CANCELLED`; estados finais não mudam.
+
+Idempotência (`docs/api/idempotency.md`): com `Idempotency-Key`, a chave é única por workflow (índice único `(organization_id, workflow_id, idempotency_key)`) e guarda o SHA-256 do body canônico. Repetir a chave com o mesmo body devolve a primeira execução com `200`; com body diferente, `409 IDEMPOTENCY_KEY_REUSED`. Requisições concorrentes com a mesma chave usam `INSERT ... ON CONFLICT DO NOTHING`, então só uma cria a execução e as outras recebem a mesma.
+
+A listagem usa keyset pagination em `(created_at desc, id desc)`. O cursor é opaco; um cursor inválido devolve `400`.
 
 ## Auditoria
 
