@@ -23,7 +23,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.test.ts', 'src/main.ts'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/main.ts',
+        'src/database/migrate.ts',
+        // Declarative table definitions; exercised by the integration tests.
+        'src/**/*.schema.ts',
+      ],
       thresholds: { lines: 80, branches: 80, functions: 80, statements: 80 },
     },
   },

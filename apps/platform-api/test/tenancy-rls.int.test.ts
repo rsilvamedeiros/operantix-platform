@@ -94,11 +94,14 @@ describe('tenant isolation enforced by PostgreSQL row-level security', () => {
   });
 
   it('refuses to insert a row for another tenant', async () => {
-    await expect(
-      withTenant(db, orgA, (tx) =>
-        tx.insert(workspaces).values({ organizationId: orgB, name: 'Hijack', slug: 'hijack' }),
-      ),
-    ).rejects.toThrow(/row-level security/);
+    const insert = withTenant(db, orgA, (tx) =>
+      tx.insert(workspaces).values({ organizationId: orgB, name: 'Hijack', slug: 'hijack' }),
+    );
+
+    // Drizzle wraps the driver error; the cause is PostgreSQL's policy violation.
+    await expect(insert).rejects.toMatchObject({
+      cause: { message: expect.stringMatching(/row-level security/) as unknown },
+    });
   });
 
   it('cannot update or delete another tenant rows', async () => {
