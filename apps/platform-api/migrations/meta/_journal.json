@@ -64,6 +64,20 @@
       "when": 1791407232379,
       "tag": "0008_workflow_active_version_reference",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791407953273,
+      "tag": "0009_executions",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791407954040,
+      "tag": "0010_executions_row_level_security",
+      "breakpoints": true
     }
   ]
 }
