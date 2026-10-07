@@ -1,9 +1,13 @@
 import type { INestApplication, NestApplicationOptions } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
 import type { AppConfig } from './config/config';
 
-export function createApp(
-  _config: AppConfig,
-  _options: NestApplicationOptions = {},
+export async function createApp(
+  config: AppConfig,
+  options: NestApplicationOptions = {},
 ): Promise<INestApplication> {
-  return Promise.reject(new Error('not implemented'));
+  const app = await NestFactory.create(AppModule.register(config), options);
+  app.enableShutdownHooks();
+  return app;
 }

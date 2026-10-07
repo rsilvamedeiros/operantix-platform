@@ -21,9 +21,10 @@ export async function evaluateReadiness(
   onFailure: (failure: CheckFailure) => void = () => undefined,
 ): Promise<ReadinessReport> {
   const results = await Promise.all(
-    checks.map(async ({ name, check }): Promise<[string, DependencyStatus]> => {
+    checks.map(async (dependency): Promise<[string, DependencyStatus]> => {
+      const { name } = dependency;
       try {
-        await withTimeout(check(), timeoutMs);
+        await withTimeout(dependency.check(), timeoutMs);
         return [name, 'up'];
       } catch (error) {
         onFailure({ name, reason: error instanceof Error ? error.message : String(error) });

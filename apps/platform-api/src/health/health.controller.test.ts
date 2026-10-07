@@ -1,11 +1,14 @@
 import 'reflect-metadata';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import type { Server } from 'node:http';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { HealthController } from './health.controller';
 import { HEALTH_OPTIONS, READINESS_CHECKS } from './health.tokens';
 import type { ReadinessCheck } from './readiness';
+
+const httpServer = (app: INestApplication): Server => app.getHttpServer() as Server;
 
 const up = (name: string): ReadinessCheck => ({ name, check: () => Promise.resolve() });
 const down = (name: string): ReadinessCheck => ({
@@ -36,7 +39,7 @@ describe('HealthController', () => {
   it('GET /health/live answers 200 without touching dependencies', async () => {
     const server = await startWith([down('postgres')]);
 
-    const res = await request(server.getHttpServer()).get('/health/live');
+    const res = await request(httpServer(server)).get('/health/live');
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok' });
@@ -45,7 +48,7 @@ describe('HealthController', () => {
   it('GET /health/ready answers 200 when every dependency is up', async () => {
     const server = await startWith([up('postgres'), up('redis')]);
 
-    const res = await request(server.getHttpServer()).get('/health/ready');
+    const res = await request(httpServer(server)).get('/health/ready');
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok', checks: { postgres: 'up', redis: 'up' } });
@@ -54,7 +57,7 @@ describe('HealthController', () => {
   it('GET /health/ready answers 503 and names the dependency that is down', async () => {
     const server = await startWith([down('postgres'), up('redis')]);
 
-    const res = await request(server.getHttpServer()).get('/health/ready');
+    const res = await request(httpServer(server)).get('/health/ready');
 
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ status: 'error', checks: { postgres: 'down', redis: 'up' } });
@@ -63,7 +66,7 @@ describe('HealthController', () => {
   it('GET /health/ready does not leak the failure reason to the client', async () => {
     const server = await startWith([down('postgres')]);
 
-    const res = await request(server.getHttpServer()).get('/health/ready');
+    const res = await request(httpServer(server)).get('/health/ready');
 
     expect(JSON.stringify(res.body)).not.toContain('password');
   });

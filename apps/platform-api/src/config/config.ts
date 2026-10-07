@@ -31,9 +31,7 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   const parsed = EnvSchema.safeParse(env);
   if (!parsed.success) {
     // Only variable names and rule messages: values may be secrets.
-    const problems = parsed.error.issues.map(
-      (issue) => `${issue.path.join('.')}: ${issue.code}`,
-    );
+    const problems = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.code}`);
     throw new ConfigValidationError(`Invalid environment configuration: ${problems.join('; ')}`);
   }
 
