@@ -30,6 +30,8 @@ export const stepStatusEnum = pgEnum('step_status', [
   'SUCCEEDED',
   'FAILED',
   'SKIPPED',
+  // Parked by the worker until the job is due again (delay steps).
+  'WAITING',
 ]);
 
 export const executions = pgTable(

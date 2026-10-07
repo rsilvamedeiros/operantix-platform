@@ -1,0 +1,1 @@
+ALTER TYPE "public"."step_status" ADD VALUE 'WAITING';

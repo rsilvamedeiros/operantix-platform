@@ -37,7 +37,7 @@ export interface ExecutionView {
 export interface StepExecutionView {
   stepId: string;
   position: number;
-  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED';
+  status: 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'SKIPPED' | 'WAITING';
   attempts: number;
   output: unknown;
   error: Record<string, unknown> | null;

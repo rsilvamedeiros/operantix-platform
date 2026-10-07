@@ -87,7 +87,7 @@ export const executionResponse = z.object({
 const stepExecutionResponse = z.object({
   stepId: z.string(),
   position: z.int().min(0),
-  status: z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'SKIPPED']),
+  status: z.enum(['PENDING', 'RUNNING', 'SUCCEEDED', 'FAILED', 'SKIPPED', 'WAITING']),
   attempts: z.int().min(0),
   output: z.unknown(),
   error: z.record(z.string(), z.unknown()).nullable(),

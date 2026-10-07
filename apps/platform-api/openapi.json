@@ -3217,7 +3217,8 @@
                               "RUNNING",
                               "SUCCEEDED",
                               "FAILED",
-                              "SKIPPED"
+                              "SKIPPED",
+                              "WAITING"
                             ]
                           },
                           "attempts": {
@@ -3415,7 +3416,8 @@
                               "RUNNING",
                               "SUCCEEDED",
                               "FAILED",
-                              "SKIPPED"
+                              "SKIPPED",
+                              "WAITING"
                             ]
                           },
                           "attempts": {
@@ -4131,7 +4133,8 @@
                               "RUNNING",
                               "SUCCEEDED",
                               "FAILED",
-                              "SKIPPED"
+                              "SKIPPED",
+                              "WAITING"
                             ]
                           },
                           "attempts": {
