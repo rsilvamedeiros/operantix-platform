@@ -18,6 +18,13 @@ Lifecycle de uma execução e de cada step, tentativas, status, outputs e erros.
 - Mudanças relevantes geram audit/event quando definido pelo caso de uso.
 - Regras de domínio ficam fora de controllers e adapters.
 
+## Implemented state (M03)
+
+- `executions` e `step_executions` em PostgreSQL, com RLS e FKs compostas `(organization_id, ...)`; a execução referencia `(workflow_id, workflow_version)`, então a versão executada é imutável.
+- State machine: `PENDING → RUNNING | CANCELLED`, `RUNNING → SUCCEEDED | FAILED | CANCELLED`; `SUCCEEDED`, `FAILED` e `CANCELLED` são terminais.
+- Start manual idempotente por `Idempotency-Key` (fingerprint SHA-256 do body canônico).
+- Ainda não implementado: worker, despacho de steps, tentativas/retry e timeline. A fila será PostgreSQL com `SKIP LOCKED` (ADR-0018, a escrever).
+
 ## Interfaces
 
 Expor apenas application commands/queries e eventos necessários. Não exportar repositories concretos como API pública do módulo.
