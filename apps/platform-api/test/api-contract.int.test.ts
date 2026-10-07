@@ -128,5 +128,13 @@ describe('API responses match the OpenAPI contract', () => {
     const executionId = (execution.body as { id: string }).id;
     await call('get', `${base}/workflows/{workflowId}/executions`, ids);
     await call('get', `${base}/executions/{executionId}`, { ...ids, executionId });
+
+    // The worker parks a delay step as WAITING; the API must document that state.
+    await database.ownerPool.query(
+      `UPDATE step_executions SET status = 'WAITING', attempts = 1 WHERE execution_id = $1`,
+      [executionId],
+    );
+    const waiting = await call('get', `${base}/executions/{executionId}`, { ...ids, executionId });
+    expect((waiting.body as { steps: { status: string }[] }).steps[0]?.status).toBe('WAITING');
   });
 });

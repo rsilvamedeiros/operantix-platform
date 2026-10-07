@@ -11,6 +11,7 @@ import {
 import type { ClaimedJob } from '../queue/job-queue';
 import { type StepDispatcher, UnsupportedStepError } from '../steps/step-dispatcher';
 import { StepError } from '../steps/step-error';
+import type { StepContext } from '../steps/step-handler';
 
 /** RESCHEDULED: a step failed with a retryable error and the job is due again later. */
 export type ExecutionOutcome = 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'RESCHEDULED';
@@ -134,6 +135,7 @@ export class ExecutionRunner {
       const result = await this.runStep(definition, step.stepId, {
         ...scope,
         input: execution.input,
+        stepStartedAt: new Date(),
       });
 
       if (
@@ -209,7 +211,7 @@ export class ExecutionRunner {
   private async runStep(
     definition: WorkflowStep | undefined,
     stepId: string,
-    context: { organizationId: string; executionId: string; input: Record<string, unknown> },
+    context: StepContext,
   ): Promise<{ output: unknown } | { failure: StepFailure }> {
     if (!definition) {
       return {

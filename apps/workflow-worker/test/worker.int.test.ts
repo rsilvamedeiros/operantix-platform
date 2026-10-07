@@ -3,6 +3,7 @@ import { createDatabase } from '../src/database';
 import type { WorkflowStep } from '../src/engine.schema';
 import { ExecutionRunner } from '../src/execution/execution-runner';
 import { JobQueue } from '../src/queue/job-queue';
+import { DelayStep } from '../src/steps/delay-step';
 import { LogStep } from '../src/steps/log-step';
 import { StepDispatcher } from '../src/steps/step-dispatcher';
 import { StepError } from '../src/steps/step-error';
@@ -29,6 +30,7 @@ describe('workflow worker against PostgreSQL', () => {
     queue = new JobQueue(db, { workerId: 'worker-test', leaseSeconds: 30 });
     const handlers: StepHandler[] = [
       new LogStep(),
+      new DelayStep(),
       { type: 'boom', run: () => Promise.reject(new Error('remote said no')) },
       {
         // Fails with a retryable error while `flakyFailures` is positive.
@@ -284,6 +286,49 @@ describe('workflow worker against PostgreSQL', () => {
       ]);
       expect(await execution(seeded.executionId)).toMatchObject({ status: 'FAILED' });
     });
+  });
+
+  it('parks a delay step without holding the worker, then resumes after it', async () => {
+    const seeded = await database.seedExecution([
+      { id: 'wait', name: 'Wait', type: 'delay', config: { seconds: 3600 } },
+      log('after'),
+    ]);
+
+    await loop.tick();
+
+    expect(await execution(seeded.executionId)).toMatchObject({ status: 'RUNNING' });
+    expect(await steps(seeded.executionId)).toMatchObject([
+      { step_id: 'wait', status: 'WAITING', attempts: 1 },
+      { step_id: 'after', status: 'PENDING', attempts: 0 },
+    ]);
+    const {
+      rows: [job],
+    } = await database.owner.query<{ wait_seconds: number; locked_until: Date | null }>(
+      `SELECT round(extract(epoch FROM run_after - now()))::int AS wait_seconds, locked_until
+       FROM execution_jobs WHERE execution_id = $1`,
+      [seeded.executionId],
+    );
+    expect(job?.locked_until).toBeNull();
+    expect(job?.wait_seconds).toBeGreaterThan(3500);
+    expect(await queue.claim(1)).toEqual([]);
+
+    // Time passes: the step started an hour ago and the job is due.
+    await database.owner.query(
+      `UPDATE step_executions SET started_at = now() - interval '2 hours'
+       WHERE execution_id = $1 AND step_id = 'wait'`,
+      [seeded.executionId],
+    );
+    await database.owner.query(
+      `UPDATE execution_jobs SET run_after = now() WHERE execution_id = $1`,
+      [seeded.executionId],
+    );
+    await loop.tick();
+
+    expect(await steps(seeded.executionId)).toMatchObject([
+      { step_id: 'wait', status: 'SUCCEEDED', attempts: 1, output: { waitedSeconds: 3600 } },
+      { step_id: 'after', status: 'SUCCEEDED', attempts: 1 },
+    ]);
+    expect(await execution(seeded.executionId)).toMatchObject({ status: 'SUCCEEDED' });
   });
 
   it('resumes an execution a crashed worker left half done', async () => {

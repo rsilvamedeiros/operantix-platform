@@ -3,7 +3,12 @@ import type { WorkflowStep } from '../engine.schema';
 import { StepDispatcher, UnsupportedStepError } from './step-dispatcher';
 import type { StepContext, StepHandler } from './step-handler';
 
-const context: StepContext = { organizationId: 'org', executionId: 'exec', input: {} };
+const context: StepContext = {
+  organizationId: 'org',
+  executionId: 'exec',
+  input: {},
+  stepStartedAt: new Date(),
+};
 const step = (type: string): WorkflowStep => ({ id: 's1', name: 'S1', type, config: {} });
 
 describe('StepDispatcher', () => {
