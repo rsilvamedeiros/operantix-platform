@@ -5,13 +5,21 @@ export class IllegalTransitionError extends Error {
   override name = 'IllegalTransitionError';
 }
 
-export function nextExecutionStatus(
-  _from: ExecutionStatus,
-  _event: ExecutionEvent,
-): ExecutionStatus {
-  throw new IllegalTransitionError('Not implemented');
+// Allowed transitions; anything absent is illegal. Terminal states have no way out.
+const TRANSITIONS: Record<ExecutionStatus, Partial<Record<ExecutionEvent, ExecutionStatus>>> = {
+  PENDING: { start: 'RUNNING', cancel: 'CANCELLED' },
+  RUNNING: { succeed: 'SUCCEEDED', fail: 'FAILED', cancel: 'CANCELLED' },
+  SUCCEEDED: {},
+  FAILED: {},
+  CANCELLED: {},
+};
+
+export function nextExecutionStatus(from: ExecutionStatus, event: ExecutionEvent): ExecutionStatus {
+  const to = TRANSITIONS[from][event];
+  if (!to) throw new IllegalTransitionError(`Cannot ${event} an execution that is ${from}`);
+  return to;
 }
 
-export function isTerminal(_status: ExecutionStatus): boolean {
-  return false;
+export function isTerminal(status: ExecutionStatus): boolean {
+  return Object.keys(TRANSITIONS[status]).length === 0;
 }
