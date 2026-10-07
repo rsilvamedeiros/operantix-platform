@@ -6,10 +6,12 @@ NestJS API principal e core modular transacional.
 
 ```bash
 docker compose up -d          # PostgreSQL e Redis
-cp .env.example .env          # na raiz; ajuste DATABASE_PASSWORD para operantix-local
+cp .env.example .env          # na raiz; DATABASE_PASSWORD e DATABASE_MIGRATION_PASSWORD=operantix-local
 pnpm install
 pnpm --filter @operantix/platform-api build
-set -a && . ./.env && set +a && pnpm --filter @operantix/platform-api start
+set -a && . ./.env && set +a
+pnpm --filter @operantix/platform-api db:migrate
+pnpm --filter @operantix/platform-api start
 ```
 
 ## Endpoints
@@ -44,8 +46,21 @@ Validada na inicialização (`src/config/config.ts`); variável ausente ou invá
 | `AUTH_ISSUER`, `AUTH_JWKS_URI` | obrigatórias (URLs) |
 | `AUTH_AUDIENCE` | obrigatória |
 
+`db:migrate` usa só `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_MIGRATION_USER` e `DATABASE_MIGRATION_PASSWORD`.
+
+## Banco de dados
+
+Drizzle ORM com migrations SQL versionadas em `migrations/` (ADR-0017).
+
+- Dois papéis: `operantix` é dono do schema e roda as migrations; `operantix_app` é o papel da API, sem `SUPERUSER` nem `BYPASSRLS`, com apenas `SELECT/INSERT/UPDATE/DELETE`. No compose ele é criado por `infrastructure/docker/postgres/init/10-app-role.sh` na primeira inicialização do volume.
+- Tabelas com `organization_id` têm `FORCE ROW LEVEL SECURITY` e a policy `tenant_isolation`. Sem tenant definido, nenhuma linha é visível.
+- Todo acesso a dados de tenant passa por `withTenant(db, organizationId, fn)`, que abre uma transação e faz `set_config('app.organization_id', ..., true)`. O valor vale só para a transação, então não vaza entre conexões do pool.
+- `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS.
+
+Para mudar o schema: edite `src/**/*.schema.ts`, rode `pnpm --filter @operantix/platform-api db:generate` e revise o SQL gerado. Policies e funções vão em migration custom (`drizzle-kit generate --custom`).
+
 ## Testes
 
 - `pnpm --filter @operantix/platform-api test`: unitários (sem infraestrutura).
-- `pnpm --filter @operantix/platform-api test:integration`: integração com PostgreSQL e Redis reais via Testcontainers (requer Docker).
+- `pnpm --filter @operantix/platform-api test:integration`: integração com PostgreSQL e Redis reais via Testcontainers (requer Docker). Os testes de tenancy aplicam as migrations e conectam como um papel sem `BYPASSRLS`.
 - `pnpm --filter @operantix/platform-api test:coverage`: os dois, com piso de 80%.
