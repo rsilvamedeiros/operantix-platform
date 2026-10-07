@@ -23,3 +23,5 @@ sequenceDiagram
 ```
 
 A sequência final pode variar durante M03/M04, mas dual-write e idempotency precisam permanecer explícitos.
+
+Estado implementado no M03: o comando de execução não passa pelo Kafka. A API grava a execução e o job em `execution_jobs` na mesma transação e responde `201`; o worker faz claim com `FOR UPDATE SKIP LOCKED` (ADR-0018, ADR-0019). Eventos de execução no Kafka entram no M04.
