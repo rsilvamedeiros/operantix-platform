@@ -7,9 +7,24 @@ export class UnsupportedStepError extends Error {
 
 /** Routes a step to the handler of its type. */
 export class StepDispatcher {
-  constructor(private readonly handlers: StepHandler[]) {}
+  private readonly handlers = new Map<string, StepHandler>();
 
-  dispatch(_step: WorkflowStep, _context: StepContext): Promise<unknown> {
-    throw new Error('not implemented');
+  constructor(handlers: StepHandler[]) {
+    for (const handler of handlers) {
+      if (this.handlers.has(handler.type)) {
+        throw new Error(`Two handlers for step type "${handler.type}"`);
+      }
+      this.handlers.set(handler.type, handler);
+    }
+  }
+
+  dispatch(step: WorkflowStep, context: StepContext): Promise<unknown> {
+    const handler = this.handlers.get(step.type);
+    if (!handler) {
+      return Promise.reject(
+        new UnsupportedStepError(`Step type "${step.type}" is not supported by this worker`),
+      );
+    }
+    return handler.run(step, context);
   }
 }

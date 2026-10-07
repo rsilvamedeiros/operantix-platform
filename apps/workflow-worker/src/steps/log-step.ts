@@ -5,7 +5,7 @@ import type { StepHandler } from './step-handler';
 export class LogStep implements StepHandler {
   readonly type = 'log';
 
-  run(_step: WorkflowStep): Promise<unknown> {
-    throw new Error('not implemented');
+  run(step: WorkflowStep): Promise<unknown> {
+    return Promise.resolve({ message: step.config['message'] });
   }
 }
