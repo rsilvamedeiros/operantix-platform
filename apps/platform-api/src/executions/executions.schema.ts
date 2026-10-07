@@ -96,3 +96,32 @@ export const stepExecutions = pgTable(
     }).onDelete('cascade'),
   ],
 );
+
+/**
+ * Work queue of the workflow worker (ADR-0018): one row per execution to run, inserted in the
+ * transaction that creates the execution. Workers lease rows with FOR UPDATE SKIP LOCKED; a
+ * lease that expires makes the row claimable again, which recovers jobs of a crashed worker.
+ */
+export const executionJobs = pgTable(
+  'execution_jobs',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    organizationId: uuid('organization_id').notNull(),
+    executionId: uuid('execution_id').notNull().unique(),
+    runAfter: timestamp('run_after', { withTimezone: true }).notNull().defaultNow(),
+    lockedUntil: timestamp('locked_until', { withTimezone: true }),
+    lockedBy: text('locked_by'),
+    attempts: integer('attempts').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(5),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index().on(t.runAfter),
+    foreignKey({
+      columns: [t.organizationId, t.executionId],
+      foreignColumns: [executions.organizationId, executions.id],
+    }).onDelete('cascade'),
+  ],
+);
