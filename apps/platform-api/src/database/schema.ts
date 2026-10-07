@@ -3,3 +3,4 @@
 export * from '../identity/identity.schema';
 export * from '../organizations/organizations.schema';
 export * from '../audit/audit.schema';
+export * from '../workflows/workflows.schema';
