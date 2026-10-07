@@ -15,8 +15,9 @@ export const users = pgTable('users', {
     .default(sql`gen_random_uuid()`),
   // `sub` claim of the identity provider; the link between a token and a user.
   authSubject: text('auth_subject').notNull().unique(),
-  email: text('email').notNull(),
-  displayName: text('display_name').notNull(),
+  // Profile claims are optional in access tokens, so they may be unknown.
+  email: text('email'),
+  displayName: text('display_name'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

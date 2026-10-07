@@ -39,3 +39,19 @@ export function isUniqueViolation(error: unknown): boolean {
     cause.code === UNIQUE_VIOLATION
   );
 }
+
+/**
+ * Runs `fn` in a read-only scope for one user: RLS shows that user's memberships, and the
+ * organizations they belong to, across tenants. Writes still need `withTenant`.
+ */
+export function withUser<T>(
+  db: Database,
+  userId: string,
+  fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT set_config('app.user_id', ${userId}, true)`);
+    await tx.execute(sql`SELECT app_current_user_id()`);
+    return fn(tx);
+  });
+}

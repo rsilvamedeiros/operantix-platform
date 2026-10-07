@@ -40,6 +40,18 @@ describe('JwtAccessTokenVerifier', () => {
     expect(principal).toEqual({ subject: 'user-123' });
   });
 
+  it('carries the email and name claims when the token has them', async () => {
+    const principal = await verifier.verify(await token({ email: 'ana@acme.test', name: 'Ana' }));
+
+    expect(principal).toEqual({ subject: 'user-123', email: 'ana@acme.test', name: 'Ana' });
+  });
+
+  it('ignores email and name claims that are not strings', async () => {
+    const principal = await verifier.verify(await token({ email: 42, name: { first: 'Ana' } }));
+
+    expect(principal).toEqual({ subject: 'user-123' });
+  });
+
   it('rejects a token signed by another key', async () => {
     await expect(verifier.verify(await token({}, otherKey))).rejects.toThrow(
       InvalidAccessTokenError,

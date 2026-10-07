@@ -20,6 +20,8 @@ import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
 import { createRedisClient, type RedisClient, redisReadinessCheck } from './infrastructure/redis';
 import { MeController } from './me/me.controller';
+import { OrganizationsController } from './organizations/organizations.controller';
+import { OrganizationsService } from './organizations/organizations.service';
 import { WorkspacesController } from './organizations/workspaces.controller';
 import { WorkspacesService } from './organizations/workspaces.service';
 import { DrizzleMembershipLookup } from './tenancy/drizzle-membership-lookup';
@@ -48,7 +50,7 @@ export class AppModule {
     const timeoutMs = config.health.checkTimeoutMs;
     return {
       module: AppModule,
-      controllers: [HealthController, MeController, WorkspacesController],
+      controllers: [HealthController, MeController, OrganizationsController, WorkspacesController],
       providers: [
         {
           provide: POSTGRES_POOL,
@@ -82,6 +84,7 @@ export class AppModule {
         // Guards run in registration order: authenticate, then authorize.
         { provide: APP_GUARD, useClass: AuthGuard },
         { provide: APP_GUARD, useClass: AuthorizationGuard },
+        OrganizationsService,
         WorkspacesService,
         ConnectionsLifecycle,
       ],
