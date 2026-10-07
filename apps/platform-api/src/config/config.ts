@@ -13,6 +13,9 @@ const EnvSchema = z.object({
   REDIS_HOST: z.string().min(1),
   REDIS_PORT: port.default(6379),
   HEALTH_CHECK_TIMEOUT_MS: z.coerce.number().int().positive().default(2000),
+  AUTH_ISSUER: z.url(),
+  AUTH_AUDIENCE: z.string().min(1),
+  AUTH_JWKS_URI: z.url(),
 });
 
 export interface AppConfig {
@@ -21,6 +24,7 @@ export interface AppConfig {
   database: { host: string; port: number; name: string; user: string; password: string };
   redis: { host: string; port: number };
   health: { checkTimeoutMs: number };
+  auth: { issuer: string; audience: string; jwksUri: string };
 }
 
 export class ConfigValidationError extends Error {
@@ -48,5 +52,6 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     },
     redis: { host: e.REDIS_HOST, port: e.REDIS_PORT },
     health: { checkTimeoutMs: e.HEALTH_CHECK_TIMEOUT_MS },
+    auth: { issuer: e.AUTH_ISSUER, audience: e.AUTH_AUDIENCE, jwksUri: e.AUTH_JWKS_URI },
   };
 }

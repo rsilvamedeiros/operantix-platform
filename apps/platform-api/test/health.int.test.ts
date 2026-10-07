@@ -70,6 +70,11 @@ describe('health endpoints against real dependencies', () => {
       },
       redis: { host: redis.getHost(), port: overrides.redisPort ?? redis.getPort() },
       health: { checkTimeoutMs: 1000 },
+      auth: {
+        issuer: 'https://auth.operantix.test/',
+        audience: 'operantix-api',
+        jwksUri: 'https://auth.operantix.test/.well-known/jwks.json',
+      },
     };
   }
 

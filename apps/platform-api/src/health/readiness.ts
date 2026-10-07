@@ -1,3 +1,5 @@
+import { errorMessage } from '../shared/error-message';
+
 export interface ReadinessCheck {
   readonly name: string;
   check(): Promise<void>;
@@ -27,7 +29,7 @@ export async function evaluateReadiness(
         await withTimeout(dependency.check(), timeoutMs);
         return [name, 'up'];
       } catch (error) {
-        onFailure({ name, reason: error instanceof Error ? error.message : String(error) });
+        onFailure({ name, reason: errorMessage(error) });
         return [name, 'down'];
       }
     }),
