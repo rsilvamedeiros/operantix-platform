@@ -36,8 +36,8 @@ Para cada módulo:
 1. Confirme escopo e non-goals no documento do módulo.
 2. Inspecione o código existente antes de criar novas abstrações.
 3. Proponha plano curto e arquivos afetados.
-4. Implemente o menor incremento vertical testável.
-5. Adicione ou atualize testes.
+4. Escreva primeiro o teste que falha (TDD, ADR-0016) e confirme que falha pelo motivo certo.
+5. Implemente o menor incremento vertical que o faz passar; depois refatore com a suíte verde.
 6. Adicione logs, métricas e traces quando aplicável.
 7. Verifique segurança e tenant isolation.
 8. Rode quality gates.
@@ -57,6 +57,8 @@ Para cada módulo:
 - Não implementar retry sem idempotência e limite explícito.
 - Não fazer refactors amplos fora do escopo do módulo atual.
 - Não alterar um ADR `Accepted` retroativamente; crie um novo ADR que o substitua.
+- Não escrever código de produção sem teste prévio que o exija, salvo exceção registrada em `docs/development/tdd.md`.
+- Não pular, desabilitar ou apagar testes para obter build verde.
 
 ## Repository target structure
 
@@ -103,6 +105,8 @@ docs/
 - Nunca logar conteúdo sensível de prompt/resposta por padrão.
 
 ## Testing requirements
+
+**TDD é a prática padrão** (ADR-0016, `docs/development/tdd.md`): teste antes do código, bug começa com teste que o reproduz, nunca pular/desabilitar teste para obter verde. O fluxo completo está em `docs/development/process.md`.
 
 Toda mudança funcional deve considerar:
 

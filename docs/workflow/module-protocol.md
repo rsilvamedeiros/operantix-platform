@@ -9,7 +9,7 @@ Cada módulo é uma unidade de decisão, implementação e validação. Não ant
 - plano de implementação;
 - código/configuração;
 - migrations/contracts quando aplicável;
-- testes;
+- testes (escritos primeiro, conforme TDD — ADR-0016);
 - telemetria;
 - documentação atualizada;
 - resumo final de diferenças entre planejado e entregue.
