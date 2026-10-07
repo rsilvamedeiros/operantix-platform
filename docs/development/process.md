@@ -27,11 +27,13 @@ Rodar os quality gates (`docs/testing/quality-gates.md`): format/lint, typecheck
 - O PR é aberto direto ao fim de cada fatia vertical validada localmente; pequeno e coeso; usa `.github/PULL_REQUEST_TEMPLATE.md`.
 - O detalhe técnico fica na descrição do PR, não nos commits.
 - Descreve problema, solução, testes (incluindo evidência de TDD), contratos, migrations, observabilidade, segurança e rollback.
-- CI verde é pré-condição para revisão e merge.
+- CI verde é pré-condição para revisão e merge. O workflow `pr-conventions` valida título e nome da branch em todo PR.
 
 ## 6. Revisão
 
-- Pelo menos uma aprovação antes do merge em `main`.
+- **Revisão automática:** todo PR fora de draft passa pelo workflow `code-review` (Claude Code), que comenta inline e publica um resumo por severidade. Ele roda de novo a cada push na branch.
+- Achados da revisão automática são corrigidos com commits novos ou respondidos no próprio comentário, explicando por que não se aplicam.
+- Pelo menos uma aprovação humana antes do merge em `main`; a revisão automática não substitui a aprovação.
 - Revisor verifica: comportamento coberto por testes que falhariam sem a mudança, tenant isolation, erros tipados, telemetria, docs.
 - Feedback é resolvido por commits novos na branch; sem force-push em branch compartilhada.
 
@@ -53,6 +55,7 @@ Decisão estrutural → novo ADR (`docs/adr/README.md`), nunca edição de ADR `
 | --- | --- |
 | Dono do produto/repositório | Prioridade, escopo, aprovação de ADR e merge |
 | Claude Code (agente) | Plano, implementação com TDD, commits, abertura do PR, acompanhamento da CI e correções; não faz merge nem altera ADR aceito |
+| Revisor automático (`code-review`) | Revisão do diff de cada PR contra ADRs, TDD, segurança/tenancy e observabilidade; apenas comenta, não aprova nem bloqueia |
 
 ## Ritmo
 
