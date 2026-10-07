@@ -24,6 +24,11 @@ pnpm --filter @operantix/platform-api start
 | `POST /v1/organizations` | Cria organização `{"name","slug"}`; quem cria vira `OWNER`. Cadastra o usuário no primeiro acesso. | `201 {"id","name","slug"}`; `400 VALIDATION_FAILED`; `409 ORGANIZATION_SLUG_TAKEN` |
 | `GET /v1/organizations/{organizationId}/workspaces` | Workspaces da organização (`workspace:read`). | `200 {"data":[{"id","name","slug","createdAt"}]}` |
 | `POST /v1/organizations/{organizationId}/workspaces` | Cria workspace `{"name","slug"}` e registra auditoria (`workspace:create`). | `201` com o workspace; `400 VALIDATION_FAILED`; `409 WORKSPACE_SLUG_TAKEN` |
+| `GET /v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Workflows do workspace (`workflow:read`). | `200 {"data":[workflow]}`; `404 WORKSPACE_NOT_FOUND` |
+| `POST /v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Cria workflow `{"name","key","definition"}` com a versão 1 (`workflow:write`). | `201` workflow; `400 VALIDATION_FAILED`; `404 WORKSPACE_NOT_FOUND`; `409 WORKFLOW_KEY_TAKEN` |
+| `GET /v1/organizations/{organizationId}/workflows/{workflowId}` | Workflow com o resumo das versões, da mais nova para a mais antiga (`workflow:read`). | `200`; `404 WORKFLOW_NOT_FOUND` |
+| `POST /v1/organizations/{organizationId}/workflows/{workflowId}/versions` | Publica nova versão `{"definition"}` (`workflow:write`). | `201 {"workflowId","version","definition","createdBy","createdAt"}`; `404 WORKFLOW_NOT_FOUND` |
+| `GET /v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}` | Uma versão com a definição completa (`workflow:read`). | `200`; `404 WORKFLOW_VERSION_NOT_FOUND` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
 O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
@@ -47,8 +52,34 @@ O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organiz
 | --- | --- | --- | --- | --- | --- |
 | `workspace:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `workspace:create` | ✓ | ✓ | | | |
+| `workflow:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `workflow:write` | ✓ | ✓ | ✓ | | |
 
 A matriz fica em `src/authorization/permissions.ts`.
+
+## Workflows
+
+Um workflow pertence a um workspace e tem versões numeradas a partir de 1. Cada versão guarda a definição validada e é imutável (trigger no banco rejeita `UPDATE`): mudar a definição é publicar uma versão nova. O número vem de um contador na linha do workflow, incrementado sob lock, então escritas concorrentes recebem números distintos. `activeVersion` fica `null` até a ativação, que entra na próxima fatia.
+
+Definição (`src/workflows/workflow-definition.ts`, `schemaVersion: 1`):
+
+```json
+{
+  "schemaVersion": 1,
+  "trigger": { "type": "manual" },
+  "steps": [
+    { "id": "check", "name": "Check", "type": "http_request", "config": { "method": "GET", "url": "https://status.example.com" } },
+    { "id": "wait", "name": "Wait", "type": "delay", "config": { "seconds": 30 } },
+    { "id": "note", "name": "Note", "type": "log", "config": { "message": "done" } }
+  ]
+}
+```
+
+- `trigger`: `manual` ou `schedule` (`cron` com 5 campos).
+- `steps`: 1 a 50, executados em ordem; `id` minúsculo e único. Tipos: `http_request` (só `http`/`https`; a política de destino contra SSRF fica na execução), `delay` (1 s a 24 h), `log`.
+- Propriedades desconhecidas são rejeitadas, para erro de digitação não passar em silêncio.
+
+Workflows e versões têm RLS e chaves estrangeiras compostas com `organization_id`, então uma linha nunca aponta para o pai de outro tenant (FK comum é checada sem RLS).
 
 ## Auditoria
 
