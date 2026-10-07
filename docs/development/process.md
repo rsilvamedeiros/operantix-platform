@@ -16,7 +16,7 @@ Plano curto (`/plan-module`): arquivos afetados, contratos, camadas de teste, ri
 
 ## 3. Implementar com TDD
 
-Branch curta a partir de `main` (`feat/…`, `fix/…`, `docs/…`, `chore/…`). Ciclo red → green → refactor, em incrementos verticais pequenos. Commits em Conventional Commits; teste antes do código. Detalhes em `tdd.md`.
+Branch curta a partir de `main` (`feat/…`, `fix/…`, `docs/…`, `chore/…`). Ciclo red → green → refactor, em incrementos verticais pequenos. Commits em Conventional Commits, em inglês, apenas assunto (sem corpo e sem trailers de autoria); teste antes do código. Detalhes em `tdd.md`.
 
 ## 4. Verificar localmente
 
@@ -24,7 +24,8 @@ Rodar os quality gates (`docs/testing/quality-gates.md`): format/lint, typecheck
 
 ## 5. Pull Request
 
-- Pequeno e coeso; usa `.github/PULL_REQUEST_TEMPLATE.md`.
+- O PR é aberto direto ao fim de cada fatia vertical validada localmente; pequeno e coeso; usa `.github/PULL_REQUEST_TEMPLATE.md`.
+- O detalhe técnico fica na descrição do PR, não nos commits.
 - Descreve problema, solução, testes (incluindo evidência de TDD), contratos, migrations, observabilidade, segurança e rollback.
 - CI verde é pré-condição para revisão e merge.
 
@@ -51,7 +52,7 @@ Decisão estrutural → novo ADR (`docs/adr/README.md`), nunca edição de ADR `
 | Papel | Responsabilidade |
 | --- | --- |
 | Dono do produto/repositório | Prioridade, escopo, aprovação de ADR e merge |
-| Claude Code (agente) | Plano, implementação com TDD, testes, docs e resumo de riscos; não faz merge nem altera ADR aceito |
+| Claude Code (agente) | Plano, implementação com TDD, commits, abertura do PR, acompanhamento da CI e correções; não faz merge nem altera ADR aceito |
 
 ## Ritmo
 
