@@ -10,9 +10,43 @@ export interface ReadinessReport {
   checks: Record<string, DependencyStatus>;
 }
 
-export function evaluateReadiness(
-  _checks: readonly ReadinessCheck[],
-  _timeoutMs: number,
+export interface CheckFailure {
+  name: string;
+  reason: string;
+}
+
+export async function evaluateReadiness(
+  checks: readonly ReadinessCheck[],
+  timeoutMs: number,
+  onFailure: (failure: CheckFailure) => void = () => undefined,
 ): Promise<ReadinessReport> {
-  return Promise.reject(new Error('not implemented'));
+  const results = await Promise.all(
+    checks.map(async ({ name, check }): Promise<[string, DependencyStatus]> => {
+      try {
+        await withTimeout(check(), timeoutMs);
+        return [name, 'up'];
+      } catch (error) {
+        onFailure({ name, reason: error instanceof Error ? error.message : String(error) });
+        return [name, 'down'];
+      }
+    }),
+  );
+
+  const statuses = Object.fromEntries(results);
+  const allUp = results.every(([, status]) => status === 'up');
+  return { status: allUp ? 'ok' : 'error', checks: statuses };
+}
+
+async function withTimeout(operation: Promise<void>, timeoutMs: number): Promise<void> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`timed out after ${String(timeoutMs)}ms`));
+    }, timeoutMs);
+  });
+  try {
+    await Promise.race([operation, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }

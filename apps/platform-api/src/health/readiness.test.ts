@@ -36,3 +36,18 @@ describe('evaluateReadiness', () => {
     expect(report).toEqual({ status: 'ok', checks: {} });
   });
 });
+
+describe('evaluateReadiness failure reporting', () => {
+  it('reports the name and reason of each failing dependency', async () => {
+    const failures: unknown[] = [];
+
+    await evaluateReadiness([down('redis'), hanging('postgres')], 20, (f) => failures.push(f));
+
+    expect(failures).toEqual(
+      expect.arrayContaining([
+        { name: 'redis', reason: 'connection refused' },
+        { name: 'postgres', reason: 'timed out after 20ms' },
+      ]),
+    );
+  });
+});
