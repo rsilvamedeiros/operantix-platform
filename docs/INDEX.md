@@ -68,6 +68,7 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/adr/0013-mongodb-adoption-is-conditional.md`
 - `docs/adr/0014-dynamodb-adoption-requires-benchmark.md`
 - `docs/adr/0015-evaluate-temporal-after-custom-execution-engine-is-understood.md`
+- `docs/adr/0016-adopt-tdd-as-default-development-practice.md`
 - `docs/adr/README.md`
 - `docs/ai/agents.md`
 - `docs/ai/architecture.md`
@@ -133,7 +134,9 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/development/initial-commit.md`
 - `docs/development/nest.md`
 - `docs/development/next.md`
+- `docs/development/process.md`
 - `docs/development/pull-requests.md`
+- `docs/development/tdd.md`
 - `docs/development/python.md`
 - `docs/development/typescript.md`
 - `docs/domains/ai.md`

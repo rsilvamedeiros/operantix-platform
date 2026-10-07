@@ -5,4 +5,4 @@
 - [ ] Dependências conhecidas
 - [ ] Contrato ou data model preliminar definido
 - [ ] Riscos de segurança/tenancy reconhecidos
-- [ ] Critério de teste definido
+- [ ] Critério de teste definido como comportamentos testáveis (ponto de partida do teste vermelho)
