@@ -10,4 +10,4 @@ Os gates evoluem por workload/path conforme novos apps entram no workspace.
 
 ## Segredos
 
-- `CLAUDE_CODE_OAUTH_TOKEN`: token do Claude Code usado pela revisão automática. Gerado com `claude setup-token` e cadastrado em Settings → Secrets and variables → Actions. Requer o Claude GitHub App instalado no repositório.
+- `CLAUDE_CODE_OAUTH_TOKEN`: token do Claude Code usado pela revisão automática. Gerado com `claude setup-token` e cadastrado em Settings → Secrets and variables → Actions. Requer o Claude GitHub App instalado no repositório. Sem o secret, o job passa com um aviso e não revisa.
