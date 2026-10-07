@@ -76,22 +76,27 @@ describe('API responses match the OpenAPI contract', () => {
       steps: [{ id: 'note', name: 'Note', type: 'log', config: { message: 'hi' } }],
     };
 
-    await call('get', '/v1/me', {});
-    const org = await call('post', '/v1/organizations', {}, { name: 'Contract', slug: 'contract' });
+    await call('get', '/api/v1/me', {});
+    const org = await call(
+      'post',
+      '/api/v1/organizations',
+      {},
+      { name: 'Contract', slug: 'contract' },
+    );
     const organizationId = (org.body as { id: string }).id;
-    await call('get', '/v1/organizations', {});
-    await call('post', '/v1/organizations', {}, { name: 'Dup', slug: 'contract' }); // 409
+    await call('get', '/api/v1/organizations', {});
+    await call('post', '/api/v1/organizations', {}, { name: 'Dup', slug: 'contract' }); // 409
 
     const ws = await call(
       'post',
-      '/v1/organizations/{organizationId}/workspaces',
+      '/api/v1/organizations/{organizationId}/workspaces',
       { organizationId },
       { name: 'Prod', slug: 'prod' },
     );
     const workspaceId = (ws.body as { id: string }).id;
-    await call('get', '/v1/organizations/{organizationId}/workspaces', { organizationId });
+    await call('get', '/api/v1/organizations/{organizationId}/workspaces', { organizationId });
 
-    const base = '/v1/organizations/{organizationId}';
+    const base = '/api/v1/organizations/{organizationId}';
     const wf = await call(
       'post',
       `${base}/workspaces/{workspaceId}/workflows`,

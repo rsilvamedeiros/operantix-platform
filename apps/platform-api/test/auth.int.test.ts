@@ -78,15 +78,23 @@ describe('authentication against a JWKS endpoint', () => {
     expect(res.status).toBe(200);
   });
 
-  it('rejects /v1/me without a token', async () => {
-    const res = await request(httpServer(app)).get('/v1/me');
+  it('serves the API only under /api', async () => {
+    const res = await request(httpServer(app))
+      .get('/v1/me')
+      .set('Authorization', `Bearer ${await token()}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects /api/v1/me without a token', async () => {
+    const res = await request(httpServer(app)).get('/api/v1/me');
 
     expect(res.status).toBe(401);
   });
 
-  it('returns the authenticated principal on /v1/me', async () => {
+  it('returns the authenticated principal on /api/v1/me', async () => {
     const res = await request(httpServer(app))
-      .get('/v1/me')
+      .get('/api/v1/me')
       .set('Authorization', `Bearer ${await token()}`);
 
     expect(res.status).toBe(200);
@@ -97,7 +105,7 @@ describe('authentication against a JWKS endpoint', () => {
     const stranger = (await generateKeyPair('ES256')).privateKey;
 
     const res = await request(httpServer(app))
-      .get('/v1/me')
+      .get('/api/v1/me')
       .set('Authorization', `Bearer ${await token('unknown', stranger)}`);
 
     expect(res.status).toBe(401);

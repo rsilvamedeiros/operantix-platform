@@ -48,7 +48,7 @@ describe('organization onboarding', () => {
 
   const createOrganization = async (sub: string, body: object, claims = {}) =>
     request(httpServer(app))
-      .post('/v1/organizations')
+      .post('/api/v1/organizations')
       .set('Authorization', await as(sub, claims))
       .send(body);
 
@@ -71,7 +71,7 @@ describe('organization onboarding', () => {
 
     // As owner, the creator can use tenant-scoped endpoints right away.
     const workspace = await request(httpServer(app))
-      .post(`/v1/organizations/${org.id}/workspaces`)
+      .post(`/api/v1/organizations/${org.id}/workspaces`)
       .set('Authorization', await as('auth|ana'))
       .send({ name: 'Production', slug: 'production' });
     expect(workspace.status).toBe(201);
@@ -124,7 +124,7 @@ describe('organization onboarding', () => {
     await createOrganization('auth|bruno', { name: 'Globex', slug: 'globex' });
 
     const res = await request(httpServer(app))
-      .get('/v1/organizations')
+      .get('/api/v1/organizations')
       .set('Authorization', await as('auth|ana'));
 
     expect(res.status).toBe(200);
@@ -138,7 +138,7 @@ describe('organization onboarding', () => {
 
   it('lists nothing for a caller without a user record', async () => {
     const res = await request(httpServer(app))
-      .get('/v1/organizations')
+      .get('/api/v1/organizations')
       .set('Authorization', await as('auth|newcomer'));
 
     expect(res.status).toBe(200);
@@ -146,7 +146,7 @@ describe('organization onboarding', () => {
   });
 
   it('requires authentication', async () => {
-    const res = await request(httpServer(app)).get('/v1/organizations');
+    const res = await request(httpServer(app)).get('/api/v1/organizations');
 
     expect(res.status).toBe(401);
   });

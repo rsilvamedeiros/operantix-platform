@@ -40,7 +40,7 @@ describe('OpenAPI document', () => {
 
   it('documents the authorization failures of every tenant-scoped operation', () => {
     const tenantScoped = operationsOf(doc).filter((o) =>
-      o.route.includes('/v1/organizations/{organizationId}'),
+      o.route.includes('/api/v1/organizations/{organizationId}'),
     );
 
     expect(tenantScoped.length).toBeGreaterThan(0);
