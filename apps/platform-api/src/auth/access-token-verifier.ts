@@ -38,7 +38,10 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifier {
       if (!payload.sub) {
         throw new InvalidAccessTokenError('token has no subject');
       }
-      return { subject: payload.sub };
+      const principal: Principal = { subject: payload.sub };
+      if (typeof payload.email === 'string') principal.email = payload.email;
+      if (typeof payload.name === 'string') principal.name = payload.name;
+      return principal;
     } catch (error) {
       if (error instanceof InvalidAccessTokenError) throw error;
       // jose's message says why (expired, bad signature...); it never contains the token.
