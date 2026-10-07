@@ -20,6 +20,8 @@ pnpm --filter @operantix/platform-api start
 | --- | --- | --- |
 | `GET /health/live` | Liveness: o processo responde. Não consulta dependências. | `200 {"status":"ok"}` |
 | `GET /v1/me` | Principal autenticado (requer `Authorization: Bearer <token>`). | `200 {"subject":"..."}`; `401 {"code":"UNAUTHENTICATED",...}` |
+| `GET /v1/organizations/{organizationId}/workspaces` | Workspaces da organização (`workspace:read`). | `200 {"data":[{"id","name","slug","createdAt"}]}` |
+| `POST /v1/organizations/{organizationId}/workspaces` | Cria workspace `{"name","slug"}` e registra auditoria (`workspace:create`). | `201` com o workspace; `400 VALIDATION_FAILED`; `409 WORKSPACE_SLUG_TAKEN` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
 O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
@@ -29,6 +31,26 @@ O Redis conecta em background com reconexão exponencial (até 5 s), então logo
 Toda rota exige um access token JWT válido, exceto as marcadas com `@Public()` (hoje só `/health/*`). O `AuthGuard` global valida assinatura (chaves do `AUTH_JWKS_URI`, com cache e refetch para `kid` desconhecido), `iss`, `aud`, `exp` e `sub`, e aceita só algoritmos assimétricos (RS256, PS256, ES256, EdDSA). O cliente recebe apenas `401 UNAUTHENTICATED`; o motivo da rejeição fica no log, nunca o token.
 
 Funciona com qualquer provedor OIDC (Auth0, Keycloak, Cognito, Entra ID...). A escolha do provedor e o login no `web` ficam para quando o frontend entrar.
+
+## Autorização e tenant
+
+O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organizationId`, ele busca a membership do `sub` do token naquela organização e monta o `TenantContext` (`organizationId`, `userId`, `role`), lido no controller com `@CurrentTenant()`. O tenant nunca vem do body.
+
+- Não membro, organização inexistente ou id inválido: `404 ORGANIZATION_NOT_FOUND` (a existência de outros tenants não vaza).
+- Papel sem a permissão da rota: `403 FORBIDDEN`.
+- Deny by default: rota com `:organizationId` sem `@RequirePermission(...)` é negada; `@RequirePermission` em rota sem organização também.
+- Rotas sem organização (ex.: `/v1/me`) só exigem autenticação.
+
+| Permissão | OWNER | ADMIN | DEVELOPER | OPERATOR | VIEWER |
+| --- | --- | --- | --- | --- | --- |
+| `workspace:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `workspace:create` | ✓ | ✓ | | | |
+
+A matriz fica em `src/authorization/permissions.ts`.
+
+## Auditoria
+
+`recordAudit(tx, tenant, event)` grava em `audit_entries` na mesma transação da mudança, então a entrada existe se e somente se a mudança foi commitada. A tabela tem RLS por tenant e um trigger que rejeita `UPDATE` e `DELETE` (append-only). Ações seguem `<recurso>.<verbo no passado>`, ex.: `workspace.created`.
 
 ## Configuração
 

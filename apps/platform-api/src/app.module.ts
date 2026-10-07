@@ -11,12 +11,19 @@ import type { Pool } from 'pg';
 import { JwtAccessTokenVerifier } from './auth/access-token-verifier';
 import { AuthGuard } from './auth/auth.guard';
 import { ACCESS_TOKEN_VERIFIER } from './auth/auth.tokens';
+import { AuthorizationGuard } from './authorization/authorization.guard';
 import type { AppConfig } from './config/config';
+import { createDatabase, type Database } from './database/database';
+import { DATABASE } from './database/database.tokens';
 import { HealthController } from './health/health.controller';
 import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
 import { createRedisClient, type RedisClient, redisReadinessCheck } from './infrastructure/redis';
 import { MeController } from './me/me.controller';
+import { WorkspacesController } from './organizations/workspaces.controller';
+import { WorkspacesService } from './organizations/workspaces.service';
+import { DrizzleMembershipLookup } from './tenancy/drizzle-membership-lookup';
+import { MEMBERSHIP_LOOKUP } from './tenancy/tenant-context';
 
 export const POSTGRES_POOL = Symbol('POSTGRES_POOL');
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
@@ -41,11 +48,17 @@ export class AppModule {
     const timeoutMs = config.health.checkTimeoutMs;
     return {
       module: AppModule,
-      controllers: [HealthController, MeController],
+      controllers: [HealthController, MeController, WorkspacesController],
       providers: [
         {
           provide: POSTGRES_POOL,
           useFactory: () => createPostgresPool(config.database, timeoutMs),
+        },
+        { provide: DATABASE, inject: [POSTGRES_POOL], useFactory: createDatabase },
+        {
+          provide: MEMBERSHIP_LOOKUP,
+          inject: [DATABASE],
+          useFactory: (db: Database) => new DrizzleMembershipLookup(db),
         },
         { provide: REDIS_CLIENT, useFactory: () => createRedisClient(config.redis, timeoutMs) },
         {
@@ -66,7 +79,10 @@ export class AppModule {
               audience: config.auth.audience,
             }),
         },
+        // Guards run in registration order: authenticate, then authorize.
         { provide: APP_GUARD, useClass: AuthGuard },
+        { provide: APP_GUARD, useClass: AuthorizationGuard },
+        WorkspacesService,
         ConnectionsLifecycle,
       ],
     };
