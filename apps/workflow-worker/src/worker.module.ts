@@ -12,6 +12,7 @@ import type { WorkerConfig } from './config';
 import { createDatabase } from './database';
 import { ExecutionRunner } from './execution/execution-runner';
 import { JobQueue } from './queue/job-queue';
+import { DelayStep } from './steps/delay-step';
 import { HttpRequestStep } from './steps/http-request-step';
 import { LogStep } from './steps/log-step';
 import { StepDispatcher } from './steps/step-dispatcher';
@@ -75,6 +76,7 @@ export class WorkerModule {
             });
             const dispatcher = new StepDispatcher([
               new LogStep(),
+              new DelayStep(),
               new HttpRequestStep(config.http),
             ]);
             const runner = new ExecutionRunner(db, dispatcher, config.retry);
