@@ -20,6 +20,8 @@ pnpm --filter @operantix/platform-api start
 | --- | --- | --- |
 | `GET /health/live` | Liveness: o processo responde. Não consulta dependências. | `200 {"status":"ok"}` |
 | `GET /v1/me` | Principal autenticado (requer `Authorization: Bearer <token>`). | `200 {"subject":"..."}`; `401 {"code":"UNAUTHENTICATED",...}` |
+| `GET /v1/organizations` | Organizações do usuário logado, com o papel em cada uma. | `200 {"data":[{"id","name","slug","role"}]}` |
+| `POST /v1/organizations` | Cria organização `{"name","slug"}`; quem cria vira `OWNER`. Cadastra o usuário no primeiro acesso. | `201 {"id","name","slug"}`; `400 VALIDATION_FAILED`; `409 ORGANIZATION_SLUG_TAKEN` |
 | `GET /v1/organizations/{organizationId}/workspaces` | Workspaces da organização (`workspace:read`). | `200 {"data":[{"id","name","slug","createdAt"}]}` |
 | `POST /v1/organizations/{organizationId}/workspaces` | Cria workspace `{"name","slug"}` e registra auditoria (`workspace:create`). | `201` com o workspace; `400 VALIDATION_FAILED`; `409 WORKSPACE_SLUG_TAKEN` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
@@ -77,7 +79,8 @@ Drizzle ORM com migrations SQL versionadas em `migrations/` (ADR-0017).
 - Dois papéis: `operantix` é dono do schema e roda as migrations; `operantix_app` é o papel da API, sem `SUPERUSER` nem `BYPASSRLS`, com apenas `SELECT/INSERT/UPDATE/DELETE`. No compose ele é criado por `infrastructure/docker/postgres/init/10-app-role.sh` na primeira inicialização do volume.
 - Tabelas com `organization_id` têm `FORCE ROW LEVEL SECURITY` e a policy `tenant_isolation`. Sem tenant definido, nenhuma linha é visível.
 - Todo acesso a dados de tenant passa por `withTenant(db, organizationId, fn)`, que abre uma transação e faz `set_config('app.organization_id', ..., true)`. O valor vale só para a transação, então não vaza entre conexões do pool.
-- `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS.
+- `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS. O registro é criado no primeiro `POST /v1/organizations` a partir do `sub` do token; `email` e `name` vêm do token quando presentes.
+- `withUser(db, userId, fn)` abre um escopo só de leitura em que o usuário vê as próprias memberships e as organizações a que pertence, em todos os tenants (policies `member_reads_own`, `FOR SELECT`). Escritas continuam exigindo `withTenant`.
 
 Para mudar o schema: edite `src/**/*.schema.ts`, rode `pnpm --filter @operantix/platform-api db:generate` e revise o SQL gerado. Policies e funções vão em migration custom (`drizzle-kit generate --custom`).
 
