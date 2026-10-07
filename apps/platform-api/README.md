@@ -41,6 +41,14 @@ Toda rota exige um access token JWT válido, exceto as marcadas com `@Public()` 
 
 Funciona com qualquer provedor OIDC (Auth0, Keycloak, Cognito, Entra ID...). A escolha do provedor e o login no `web` ficam para quando o frontend entrar.
 
+## Contrato OpenAPI
+
+`GET /openapi.json` (público) serve o documento OpenAPI 3.1, gerado de `src/openapi/openapi.document.ts`. Os schemas de request são os mesmos zod que validam a entrada, e os de response ficam em `src/openapi/responses.ts`.
+
+- Um teste unitário garante que o documento lista exatamente as rotas dos controllers e que `openapi.json` (commitado) está igual ao que o código serve. Mudou o contrato: rode `pnpm --filter @operantix/platform-api build && pnpm --filter @operantix/platform-api openapi:generate` e o diff aparece no PR.
+- Um teste de integração percorre o fluxo principal e valida cada resposta real contra o schema documentado para aquele status.
+- `x-permission` em cada operação indica a permissão exigida.
+
 ## Autorização e tenant
 
 O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organizationId`, ele busca a membership do `sub` do token naquela organização e monta o `TenantContext` (`organizationId`, `userId`, `role`), lido no controller com `@CurrentTenant()`. O tenant nunca vem do body.

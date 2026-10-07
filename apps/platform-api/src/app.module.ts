@@ -20,6 +20,7 @@ import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
 import { createRedisClient, type RedisClient, redisReadinessCheck } from './infrastructure/redis';
 import { MeController } from './me/me.controller';
+import { OpenApiController } from './openapi/openapi.controller';
 import { OrganizationsController } from './organizations/organizations.controller';
 import { OrganizationsService } from './organizations/organizations.service';
 import { WorkspacesController } from './organizations/workspaces.controller';
@@ -46,19 +47,22 @@ class ConnectionsLifecycle implements OnApplicationShutdown {
   }
 }
 
+export const CONTROLLERS = [
+  HealthController,
+  MeController,
+  OrganizationsController,
+  WorkspacesController,
+  WorkflowsController,
+  OpenApiController,
+];
+
 @Module({})
 export class AppModule {
   static register(config: AppConfig): DynamicModule {
     const timeoutMs = config.health.checkTimeoutMs;
     return {
       module: AppModule,
-      controllers: [
-        HealthController,
-        MeController,
-        OrganizationsController,
-        WorkspacesController,
-        WorkflowsController,
-      ],
+      controllers: CONTROLLERS,
       providers: [
         {
           provide: POSTGRES_POOL,
