@@ -15,6 +15,16 @@ const trigger = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('schedule'), cron }),
 ]);
 
+// Definitions are stored in plain text and readable by every role, so credentials must not be
+// inlined. Secret references for HTTP steps arrive with integrations (M05).
+const CREDENTIAL_HEADER = /^(authorization|proxy-authorization|cookie|x-api-key|x-auth-token)$/i;
+const headers = z
+  .record(z.string(), z.string())
+  .refine(
+    (value) => Object.keys(value).every((name) => !CREDENTIAL_HEADER.test(name)),
+    'Credential headers are not allowed; use a secret reference',
+  );
+
 const stepBase = {
   id: z.string().regex(/^[a-z][a-z0-9_]{0,62}$/, 'Expected a lowercase identifier'),
   name: z.string().trim().min(1).max(100),
@@ -28,7 +38,7 @@ const step = z.discriminatedUnion('type', [
       method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
       // Only the scheme is checked here; destination policy (SSRF) is enforced at execution.
       url: z.url({ protocol: /^https?$/ }),
-      headers: z.record(z.string(), z.string()).optional(),
+      headers: headers.optional(),
       body: z.unknown().optional(),
     }),
   }),

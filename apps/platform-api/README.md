@@ -77,6 +77,7 @@ Definição (`src/workflows/workflow-definition.ts`, `schemaVersion: 1`):
 
 - `trigger`: `manual` ou `schedule` (`cron` com 5 campos).
 - `steps`: 1 a 50, executados em ordem; `id` minúsculo e único. Tipos: `http_request` (só `http`/`https`; a política de destino contra SSRF fica na execução), `delay` (1 s a 24 h), `log`.
+- Headers de credencial (`Authorization`, `Proxy-Authorization`, `Cookie`, `X-API-Key`, `X-Auth-Token`) são rejeitados: a definição fica em texto puro e qualquer papel lê. Referências a secrets entram com as integrações (M05).
 - Propriedades desconhecidas são rejeitadas, para erro de digitação não passar em silêncio.
 
 Workflows e versões têm RLS e chaves estrangeiras compostas com `organization_id`, então uma linha nunca aponta para o pai de outro tenant (FK comum é checada sem RLS).
