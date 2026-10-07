@@ -70,6 +70,7 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/adr/0015-evaluate-temporal-after-custom-execution-engine-is-understood.md`
 - `docs/adr/0016-adopt-tdd-as-default-development-practice.md`
 - `docs/adr/0017-use-drizzle-and-row-level-security-for-postgresql.md`
+- `docs/adr/0018-use-postgresql-as-the-execution-job-queue.md`
 - `docs/adr/README.md`
 - `docs/ai/agents.md`
 - `docs/ai/architecture.md`
