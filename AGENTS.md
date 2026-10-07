@@ -23,4 +23,6 @@ Este arquivo oferece uma versão neutra das diretrizes para ferramentas de codin
 
 ## Quality
 
+TDD é a prática padrão (`docs/development/tdd.md`, ADR-0016): teste antes do código. Processo completo em `docs/development/process.md`.
+
 Toda feature deve tratar comportamento feliz, erros, autorização, tenant isolation, testes e telemetria quando aplicável.

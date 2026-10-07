@@ -5,6 +5,7 @@
 ## Scope / non-goals
 
 ## Tests
+- [ ] Testes escritos antes do código (TDD) — descreva o teste vermelho inicial ou indique commits `test:` anteriores
 - [ ] Unit
 - [ ] Integration
 - [ ] Contract
