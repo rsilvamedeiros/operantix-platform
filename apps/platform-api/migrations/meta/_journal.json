@@ -29,6 +29,20 @@
       "when": 1791406109767,
       "tag": "0003_audit_entries_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791406387859,
+      "tag": "0004_users_optional_profile",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791406388546,
+      "tag": "0005_user_scoped_reads",
+      "breakpoints": true
     }
   ]
 }
