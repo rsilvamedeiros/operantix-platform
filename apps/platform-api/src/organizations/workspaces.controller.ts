@@ -10,7 +10,7 @@ import {
 } from './workspace.dto';
 import { WorkspacesService, WorkspaceSlugTakenError } from './workspaces.service';
 
-@Controller('v1/organizations/:organizationId/workspaces')
+@Controller('api/v1/organizations/:organizationId/workspaces')
 export class WorkspacesController {
   constructor(private readonly workspaces: WorkspacesService) {}
 

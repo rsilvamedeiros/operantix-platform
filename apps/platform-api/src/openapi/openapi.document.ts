@@ -40,7 +40,7 @@ interface Operation {
 const error = (description: string): Response => ({ description, schema: responses.errorResponse });
 const ok = (description: string, schema: z.ZodType): Response => ({ description, schema });
 
-const ORG = '/v1/organizations/{organizationId}';
+const ORG = '/api/v1/organizations/{organizationId}';
 const invalidBody = error('`VALIDATION_FAILED`: the body does not match the schema');
 
 // Single source of the HTTP contract. A unit test checks it lists exactly the controllers'
@@ -75,7 +75,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
-    path: '/v1/me',
+    path: '/api/v1/me',
     summary: 'The authenticated principal',
     tag: 'identity',
     access: 'authenticated',
@@ -83,7 +83,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'get',
-    path: '/v1/organizations',
+    path: '/api/v1/organizations',
     summary: 'Organizations of the caller, with their role',
     tag: 'organizations',
     access: 'authenticated',
@@ -91,7 +91,7 @@ const OPERATIONS: Operation[] = [
   },
   {
     method: 'post',
-    path: '/v1/organizations',
+    path: '/api/v1/organizations',
     summary: 'Create an organization; the caller becomes its OWNER',
     tag: 'organizations',
     access: 'authenticated',

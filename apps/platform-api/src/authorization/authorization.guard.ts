@@ -40,7 +40,7 @@ export class AuthorizationGuard implements CanActivate {
     const organizationId = request.params.organizationId;
 
     if (organizationId === undefined) {
-      // Authenticated-only routes (e.g. /v1/me) pass; a permission needs a tenant to apply to.
+      // Authenticated-only routes (e.g. /api/v1/me) pass; a permission needs a tenant to apply to.
       if (permission === undefined) return true;
       throw forbidden();
     }
