@@ -26,6 +26,7 @@ export const workspaces = pgTable(
     slug: text('slug').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
-  // The unique (organization_id, slug) index also serves tenant-scoped lookups.
-  (t) => [unique().on(t.organizationId, t.slug)],
+  // The unique (organization_id, slug) index also serves tenant-scoped lookups;
+  // (organization_id, id) is the target of tenant-safe composite foreign keys.
+  (t) => [unique().on(t.organizationId, t.slug), unique().on(t.organizationId, t.id)],
 );
