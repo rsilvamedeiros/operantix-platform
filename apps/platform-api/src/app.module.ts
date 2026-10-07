@@ -20,6 +20,7 @@ import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
 import { createRedisClient, type RedisClient, redisReadinessCheck } from './infrastructure/redis';
 import { MeController } from './me/me.controller';
+import { OpenApiController } from './openapi/openapi.controller';
 import { OrganizationsController } from './organizations/organizations.controller';
 import { OrganizationsService } from './organizations/organizations.service';
 import { WorkspacesController } from './organizations/workspaces.controller';
@@ -52,6 +53,7 @@ export const CONTROLLERS = [
   OrganizationsController,
   WorkspacesController,
   WorkflowsController,
+  OpenApiController,
 ];
 
 @Module({})
