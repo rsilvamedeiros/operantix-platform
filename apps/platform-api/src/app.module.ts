@@ -46,19 +46,21 @@ class ConnectionsLifecycle implements OnApplicationShutdown {
   }
 }
 
+export const CONTROLLERS = [
+  HealthController,
+  MeController,
+  OrganizationsController,
+  WorkspacesController,
+  WorkflowsController,
+];
+
 @Module({})
 export class AppModule {
   static register(config: AppConfig): DynamicModule {
     const timeoutMs = config.health.checkTimeoutMs;
     return {
       module: AppModule,
-      controllers: [
-        HealthController,
-        MeController,
-        OrganizationsController,
-        WorkspacesController,
-        WorkflowsController,
-      ],
+      controllers: CONTROLLERS,
       providers: [
         {
           provide: POSTGRES_POOL,
