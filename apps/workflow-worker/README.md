@@ -52,7 +52,7 @@ Regras:
 
 Política de destino (SSRF, `src/net/destination-policy.ts`): loopback, redes privadas, link-local (inclui metadata de cloud `169.254.169.254`), CGNAT, multicast e faixas reservadas são recusados com `DESTINATION_BLOCKED`, em IPv4, IPv6 e IPv4 mapeado em IPv6. A checagem roda sobre o endereço resolvido no momento da conexão (hook de `lookup`), então um nome que passa a resolver para um IP privado (DNS rebinding) também é recusado. IPs literais são checados antes de conectar. Em produção, a política não pode ser desligada; egress controlado por rede continua recomendado (`docs/security`).
 
-`delay` entra na próxima fatia do M03.
+- `delay`: espera `seconds` desde o primeiro início do step sem segurar worker nem lease. Antes do prazo, o step fica `WAITING` e o job é reagendado para o fim da espera; ao acordar, o step continua na mesma tentativa e a saída é `{waitedSeconds}`.
 
 ## Dados
 
