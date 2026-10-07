@@ -82,7 +82,12 @@ describe('workflows API', () => {
   const workflowsOf = (org: string, workspace: string) =>
     `/v1/organizations/${org}/workspaces/${workspace}/workflows`;
 
-  const createWorkflow = async (sub: string, key: string, workspace = acmeProduction, org = acme) =>
+  const createWorkflow = async (
+    sub: string,
+    key: string,
+    workspace: string = acmeProduction,
+    org: string = acme,
+  ) =>
     request(httpServer(app))
       .post(workflowsOf(org, workspace))
       .set('Authorization', await as(sub))

@@ -26,6 +26,8 @@ import { WorkspacesController } from './organizations/workspaces.controller';
 import { WorkspacesService } from './organizations/workspaces.service';
 import { DrizzleMembershipLookup } from './tenancy/drizzle-membership-lookup';
 import { MEMBERSHIP_LOOKUP } from './tenancy/tenant-context';
+import { WorkflowsController } from './workflows/workflows.controller';
+import { WorkflowsService } from './workflows/workflows.service';
 
 export const POSTGRES_POOL = Symbol('POSTGRES_POOL');
 export const REDIS_CLIENT = Symbol('REDIS_CLIENT');
@@ -50,7 +52,13 @@ export class AppModule {
     const timeoutMs = config.health.checkTimeoutMs;
     return {
       module: AppModule,
-      controllers: [HealthController, MeController, OrganizationsController, WorkspacesController],
+      controllers: [
+        HealthController,
+        MeController,
+        OrganizationsController,
+        WorkspacesController,
+        WorkflowsController,
+      ],
       providers: [
         {
           provide: POSTGRES_POOL,
@@ -86,6 +94,7 @@ export class AppModule {
         { provide: APP_GUARD, useClass: AuthorizationGuard },
         OrganizationsService,
         WorkspacesService,
+        WorkflowsService,
         ConnectionsLifecycle,
       ],
     };
