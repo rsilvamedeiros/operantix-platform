@@ -88,6 +88,39 @@ describe('workflowDefinitionSchema', () => {
     expect(issuesOf({ ...valid, steps })).toEqual(['steps.0.config.url']);
   });
 
+  it.each(['Authorization', 'cookie', 'X-API-Key', 'Proxy-Authorization', 'x-auth-token'])(
+    'rejects the credential-bearing header %s, which would be stored in plain text',
+    (header) => {
+      const steps = [
+        {
+          id: 'call',
+          name: 'Call',
+          type: 'http_request',
+          config: { method: 'GET', url: 'https://api.example.test', headers: { [header]: 'x' } },
+        },
+      ];
+
+      expect(issuesOf({ ...valid, steps })).toEqual([`steps.0.config.headers`]);
+    },
+  );
+
+  it('accepts ordinary headers', () => {
+    const steps = [
+      {
+        id: 'call',
+        name: 'Call',
+        type: 'http_request',
+        config: {
+          method: 'GET',
+          url: 'https://api.example.test',
+          headers: { Accept: 'text/plain' },
+        },
+      },
+    ];
+
+    expect(issuesOf({ ...valid, steps })).toEqual([]);
+  });
+
   it('rejects step ids that are not lowercase identifiers', () => {
     const steps = [{ ...valid.steps[2], id: 'Not An Id' }];
 
