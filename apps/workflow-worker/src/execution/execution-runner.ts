@@ -5,7 +5,13 @@ import { executions, stepExecutions, type WorkflowStep, workflowVersions } from 
 import type { ClaimedJob } from '../queue/job-queue';
 import { type StepDispatcher, UnsupportedStepError } from '../steps/step-dispatcher';
 
-export type ExecutionOutcome = 'SUCCEEDED' | 'FAILED' | 'CANCELLED';
+/** RESCHEDULED: a step failed with a retryable error and the job is due again later. */
+export type ExecutionOutcome = 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'RESCHEDULED';
+
+export interface RetryPolicy {
+  maxStepAttempts: number;
+  baseDelayMs: number;
+}
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
@@ -25,6 +31,7 @@ export class ExecutionRunner {
   constructor(
     private readonly db: Database,
     private readonly dispatcher: StepDispatcher,
+    private readonly retry: RetryPolicy = { maxStepAttempts: 3, baseDelayMs: 2_000 },
   ) {}
 
   async run(job: ClaimedJob): Promise<ExecutionOutcome> {
@@ -186,7 +193,7 @@ export class ExecutionRunner {
 async function finish(
   tx: Transaction,
   executionId: string,
-  status: ExecutionOutcome,
+  status: 'SUCCEEDED' | 'FAILED',
   error: Record<string, unknown> | null,
 ): Promise<void> {
   await tx

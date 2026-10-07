@@ -24,6 +24,8 @@ export interface WorkerConfig {
   workerId: string;
   database: { host: string; port: number; name: string; user: string; password: string };
   queue: { batchSize: number; pollIntervalMs: number; leaseSeconds: number };
+  http: { timeoutMs: number; allowPrivateNetworks: boolean; maxResponseBytes: number };
+  retry: { maxStepAttempts: number; baseDelayMs: number };
 }
 
 export class ConfigValidationError extends Error {
@@ -54,5 +56,8 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
       pollIntervalMs: e.WORKER_POLL_INTERVAL_MS,
       leaseSeconds: e.WORKER_LEASE_SECONDS,
     },
+    // Not read from the environment yet.
+    http: { timeoutMs: 10_000, allowPrivateNetworks: false, maxResponseBytes: 65_536 },
+    retry: { maxStepAttempts: 3, baseDelayMs: 2_000 },
   };
 }
