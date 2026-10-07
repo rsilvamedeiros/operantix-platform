@@ -53,3 +53,11 @@ export interface ExecutionPage {
   data: ExecutionView[];
   nextCursor: string | null;
 }
+
+export interface ExecutionEventView {
+  type: string;
+  stepId: string | null;
+  attempt: number | null;
+  details: Record<string, unknown> | null;
+  occurredAt: Date;
+}
