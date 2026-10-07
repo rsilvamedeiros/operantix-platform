@@ -2,10 +2,12 @@ import {
   Body,
   ConflictException,
   Controller,
+  Delete,
   Get,
   NotFoundException,
   Param,
   Post,
+  Put,
 } from '@nestjs/common';
 import { RequirePermission } from '../authorization/require-permission.decorator';
 import { PositiveIntParamPipe, UuidParamPipe } from '../shared/path-params';
@@ -13,6 +15,8 @@ import { ZodValidationPipe } from '../shared/zod-validation.pipe';
 import { CurrentTenant } from '../tenancy/current-tenant.decorator';
 import type { TenantContext } from '../tenancy/tenant-context';
 import {
+  type ActivateWorkflowInput,
+  activateWorkflowSchema,
   type CreateWorkflowInput,
   createWorkflowSchema,
   type CreateWorkflowVersionInput,
@@ -101,6 +105,25 @@ export class WorkflowsController {
     @Body(new ZodValidationPipe(createWorkflowVersionSchema)) input: CreateWorkflowVersionInput,
   ): Promise<WorkflowVersionView> {
     return mapped(this.workflows.addVersion(tenant, workflowId, input.definition));
+  }
+
+  @RequirePermission('workflow:activate')
+  @Put('workflows/:workflowId/activation')
+  activate(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('workflowId', new UuidParamPipe(workflowNotFound)) workflowId: string,
+    @Body(new ZodValidationPipe(activateWorkflowSchema)) input: ActivateWorkflowInput,
+  ): Promise<WorkflowView> {
+    return mapped(this.workflows.activate(tenant, workflowId, input.version));
+  }
+
+  @RequirePermission('workflow:activate')
+  @Delete('workflows/:workflowId/activation')
+  deactivate(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('workflowId', new UuidParamPipe(workflowNotFound)) workflowId: string,
+  ): Promise<WorkflowView> {
+    return mapped(this.workflows.deactivate(tenant, workflowId));
   }
 
   @RequirePermission('workflow:read')

@@ -12,6 +12,9 @@ export type CreateWorkflowInput = z.output<typeof createWorkflowSchema>;
 export const createWorkflowVersionSchema = z.object({ definition: workflowDefinitionSchema });
 export type CreateWorkflowVersionInput = z.output<typeof createWorkflowVersionSchema>;
 
+export const activateWorkflowSchema = z.object({ version: z.int().min(1) });
+export type ActivateWorkflowInput = z.output<typeof activateWorkflowSchema>;
+
 export interface WorkflowView {
   id: string;
   workspaceId: string;
