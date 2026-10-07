@@ -31,7 +31,7 @@ describe('loadConfig', () => {
   it('reads explicit values', () => {
     const config = loadConfig({
       ...required,
-      NODE_ENV: 'production',
+      NODE_ENV: 'test',
       DATABASE_PORT: '6543',
       WORKER_ID: 'worker-a',
       WORKER_BATCH_SIZE: '10',
@@ -45,7 +45,7 @@ describe('loadConfig', () => {
     });
 
     expect(config).toMatchObject({
-      env: 'production',
+      env: 'test',
       workerId: 'worker-a',
       database: { port: 6543 },
       queue: { batchSize: 10, pollIntervalMs: 250, leaseSeconds: 120 },

@@ -12,6 +12,7 @@ import type { WorkerConfig } from './config';
 import { createDatabase } from './database';
 import { ExecutionRunner } from './execution/execution-runner';
 import { JobQueue } from './queue/job-queue';
+import { HttpRequestStep } from './steps/http-request-step';
 import { LogStep } from './steps/log-step';
 import { StepDispatcher } from './steps/step-dispatcher';
 import { WorkerLoop } from './worker-loop';
@@ -72,7 +73,11 @@ export class WorkerModule {
               workerId: config.workerId,
               leaseSeconds: config.queue.leaseSeconds,
             });
-            const runner = new ExecutionRunner(db, new StepDispatcher([new LogStep()]));
+            const dispatcher = new StepDispatcher([
+              new LogStep(),
+              new HttpRequestStep(config.http),
+            ]);
+            const runner = new ExecutionRunner(db, dispatcher, config.retry);
             return new WorkerLoop(queue, runner, config.queue);
           },
         },
