@@ -17,3 +17,19 @@ describe('hasPermission', () => {
     expect(hasPermission(role, 'workspace:create')).toBe(allowed);
   });
 });
+
+describe('workflow permissions', () => {
+  it.each(roles)('lets %s read workflows', (role) => {
+    expect(hasPermission(role, 'workflow:read')).toBe(true);
+  });
+
+  it.each([
+    ['OWNER', true],
+    ['ADMIN', true],
+    ['DEVELOPER', true],
+    ['OPERATOR', false],
+    ['VIEWER', false],
+  ] as const)('lets %s write workflows: %s', (role, allowed) => {
+    expect(hasPermission(role, 'workflow:write')).toBe(allowed);
+  });
+});
