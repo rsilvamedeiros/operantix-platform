@@ -11,7 +11,8 @@
     "test:integration": "vitest run --project integration",
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node --enable-source-maps dist/database/migrate.js"
+    "db:migrate": "node --enable-source-maps dist/database/migrate.js",
+    "openapi:generate": "node --enable-source-maps dist/openapi/generate.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",

@@ -27,6 +27,7 @@ export default defineConfig({
         'src/**/*.test.ts',
         'src/main.ts',
         'src/database/migrate.ts',
+        'src/openapi/generate.ts',
         // Declarative table definitions; exercised by the integration tests.
         'src/**/*.schema.ts',
       ],
