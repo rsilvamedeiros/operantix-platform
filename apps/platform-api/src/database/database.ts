@@ -39,3 +39,11 @@ export function isUniqueViolation(error: unknown): boolean {
     cause.code === UNIQUE_VIOLATION
   );
 }
+
+export function withUser<T>(
+  _db: Database,
+  _userId: string,
+  _fn: (tx: Transaction) => Promise<T>,
+): Promise<T> {
+  throw new Error('Not implemented');
+}

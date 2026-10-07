@@ -3,6 +3,9 @@ import { errorMessage } from '../shared/error-message';
 
 export interface Principal {
   subject: string;
+  /** Profile claims, when the identity provider puts them in the access token. */
+  email?: string;
+  name?: string;
 }
 
 export interface AccessTokenVerifier {

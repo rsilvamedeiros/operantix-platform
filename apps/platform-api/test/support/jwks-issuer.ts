@@ -7,8 +7,8 @@ export const AUDIENCE = 'operantix-api';
 
 export interface JwksIssuer {
   jwksUri: string;
-  /** A valid access token for `subject`. */
-  token(subject: string): Promise<string>;
+  /** A valid access token for `subject`, with optional extra claims. */
+  token(subject: string, claims?: Record<string, unknown>): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -25,8 +25,8 @@ export async function startJwksIssuer(): Promise<JwksIssuer> {
 
   return {
     jwksUri: `http://127.0.0.1:${String(port)}/jwks.json`,
-    token: (subject) =>
-      new SignJWT({})
+    token: (subject, claims = {}) =>
+      new SignJWT({ ...claims })
         .setProtectedHeader({ alg: 'ES256', kid: 'k1' })
         .setIssuer(ISSUER)
         .setAudience(AUDIENCE)

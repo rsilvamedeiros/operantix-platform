@@ -5,7 +5,7 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { eq, sql } from 'drizzle-orm';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createDatabase, type Database, withTenant } from '../src/database/database';
+import { createDatabase, type Database, withTenant, withUser } from '../src/database/database';
 import { runMigrations } from '../src/database/migrations';
 import { memberships, users } from '../src/identity/identity.schema';
 import { organizations, workspaces } from '../src/organizations/organizations.schema';
@@ -144,6 +144,30 @@ describe('tenant isolation enforced by PostgreSQL row-level security', () => {
     const rows = await db.select().from(users).where(eq(users.authSubject, 'auth|a'));
 
     expect(rows.map((u) => u.id)).toEqual([userA]);
+  });
+
+  it('lets a user read their own memberships and organizations across tenants', async () => {
+    const [members, orgs] = await withUser(db, userA, async (tx) => [
+      await tx.select().from(memberships),
+      await tx.select().from(organizations),
+    ]);
+
+    expect(members.map((m) => m.userId)).toEqual([userA]);
+    expect(orgs.map((o) => o.id)).toEqual([orgA]);
+  });
+
+  it('keeps the user scope read-only', async () => {
+    const insert = withUser(db, userA, (tx) =>
+      tx.insert(memberships).values({ organizationId: orgB, userId: userA, role: 'OWNER' }),
+    );
+
+    await expect(insert).rejects.toMatchObject({
+      cause: { message: expect.stringMatching(/row-level security/) as unknown },
+    });
+  });
+
+  it('does not show workspaces in the user scope', async () => {
+    expect(await withUser(db, userA, (tx) => tx.select().from(workspaces))).toEqual([]);
   });
 
   it('rejects a malformed tenant id instead of matching nothing silently', async () => {
