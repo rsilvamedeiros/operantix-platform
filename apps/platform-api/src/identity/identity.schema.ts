@@ -6,6 +6,7 @@ import { organizations } from '../organizations/organizations.schema';
 // memberships are tenant-bound and protected by RLS (ADR-0017).
 
 export const roles = ['OWNER', 'ADMIN', 'DEVELOPER', 'OPERATOR', 'VIEWER'] as const;
+export type Role = (typeof roles)[number];
 export const roleEnum = pgEnum('role', roles);
 
 export const users = pgTable('users', {
