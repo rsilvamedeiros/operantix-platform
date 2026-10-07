@@ -28,6 +28,8 @@ pnpm --filter @operantix/platform-api start
 | `POST /v1/organizations/{organizationId}/workspaces/{workspaceId}/workflows` | Cria workflow `{"name","key","definition"}` com a versão 1 (`workflow:write`). | `201` workflow; `400 VALIDATION_FAILED`; `404 WORKSPACE_NOT_FOUND`; `409 WORKFLOW_KEY_TAKEN` |
 | `GET /v1/organizations/{organizationId}/workflows/{workflowId}` | Workflow com o resumo das versões, da mais nova para a mais antiga (`workflow:read`). | `200`; `404 WORKFLOW_NOT_FOUND` |
 | `POST /v1/organizations/{organizationId}/workflows/{workflowId}/versions` | Publica nova versão `{"definition"}` (`workflow:write`). | `201 {"workflowId","version","definition","createdBy","createdAt"}`; `404 WORKFLOW_NOT_FOUND` |
+| `PUT /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Ativa uma versão `{"version"}` (`workflow:activate`). Reativar a versão ativa não muda nada. | `200` workflow; `404 WORKFLOW_VERSION_NOT_FOUND` |
+| `DELETE /v1/organizations/{organizationId}/workflows/{workflowId}/activation` | Desativa (`workflow:activate`); idempotente. | `200` workflow com `activeVersion: null` |
 | `GET /v1/organizations/{organizationId}/workflows/{workflowId}/versions/{version}` | Uma versão com a definição completa (`workflow:read`). | `200`; `404 WORKFLOW_VERSION_NOT_FOUND` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
@@ -54,12 +56,13 @@ O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organiz
 | `workspace:create` | ✓ | ✓ | | | |
 | `workflow:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `workflow:write` | ✓ | ✓ | ✓ | | |
+| `workflow:activate` | ✓ | ✓ | ✓ | ✓ | |
 
 A matriz fica em `src/authorization/permissions.ts`.
 
 ## Workflows
 
-Um workflow pertence a um workspace e tem versões numeradas a partir de 1. Cada versão guarda a definição validada e é imutável (trigger no banco rejeita `UPDATE`): mudar a definição é publicar uma versão nova. O número vem de um contador na linha do workflow, incrementado sob lock, então escritas concorrentes recebem números distintos. `activeVersion` fica `null` até a ativação, que entra na próxima fatia.
+Um workflow pertence a um workspace e tem versões numeradas a partir de 1. Cada versão guarda a definição validada e é imutável (trigger no banco rejeita `UPDATE`): mudar a definição é publicar uma versão nova. O número vem de um contador na linha do workflow, incrementado sob lock, então escritas concorrentes recebem números distintos. `activeVersion` é a versão que novas execuções vão usar; `null` enquanto inativo. Ativar e desativar leem o workflow com `FOR UPDATE` e auditam `workflow.activated` (`version`, `previousVersion`) e `workflow.deactivated`; operações sem efeito não geram auditoria. Uma FK `(id, active_version) → workflow_versions (workflow_id, version)` garante no banco que a versão ativa existe. OPERATOR pode ativar, mas não editar definições.
 
 Definição (`src/workflows/workflow-definition.ts`, `schemaVersion: 1`):
 
