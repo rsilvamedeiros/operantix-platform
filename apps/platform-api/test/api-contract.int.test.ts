@@ -114,5 +114,14 @@ describe('API responses match the OpenAPI contract', () => {
     }); // 404
     await call('put', `${base}/workflows/{workflowId}/activation`, ids, { version: 2 });
     await call('delete', `${base}/workflows/{workflowId}/activation`, ids);
+
+    await call('post', `${base}/workflows/{workflowId}/executions`, ids, {}); // 409 inactive
+    await call('put', `${base}/workflows/{workflowId}/activation`, ids, { version: 2 });
+    const execution = await call('post', `${base}/workflows/{workflowId}/executions`, ids, {
+      input: { orderId: 'o-1' },
+    });
+    const executionId = (execution.body as { id: string }).id;
+    await call('get', `${base}/workflows/{workflowId}/executions`, ids);
+    await call('get', `${base}/executions/{executionId}`, { ...ids, executionId });
   });
 });
