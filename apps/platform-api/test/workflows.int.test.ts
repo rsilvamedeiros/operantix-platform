@@ -361,6 +361,22 @@ describe('workflows API', () => {
       expect(res.body).toMatchObject({ code: 'WORKFLOW_NOT_FOUND' });
     });
 
+    it('still lets an active workflow be removed with its versions', async () => {
+      const id = await workflowWithTwoVersions('removable');
+      await request(httpServer(app))
+        .put(activationOf(id))
+        .set('Authorization', await as(operator.sub))
+        .send({ version: 2 });
+
+      await database.ownerPool.query('DELETE FROM workflows WHERE id = $1', [id]);
+
+      const { rows } = await database.ownerPool.query(
+        'SELECT count(*)::int AS n FROM workflow_versions WHERE workflow_id = $1',
+        [id],
+      );
+      expect(rows).toEqual([{ n: 0 }]);
+    });
+
     it('refuses at the database level to point at a version that does not exist', async () => {
       const id = await workflowWithTwoVersions('db-guard');
 
