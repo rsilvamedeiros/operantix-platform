@@ -5,6 +5,7 @@ import { ExecutionRunner } from '../src/execution/execution-runner';
 import { JobQueue } from '../src/queue/job-queue';
 import { LogStep } from '../src/steps/log-step';
 import { StepDispatcher } from '../src/steps/step-dispatcher';
+import type { StepHandler } from '../src/steps/step-handler';
 import { WorkerLoop } from '../src/worker-loop';
 import { type EngineDatabase, startEngineDatabase } from './support/engine-database';
 
@@ -24,7 +25,21 @@ describe('workflow worker against PostgreSQL', () => {
     await database.owner.query('DELETE FROM execution_jobs');
     const db = createDatabase(database.worker);
     queue = new JobQueue(db, { workerId: 'worker-test', leaseSeconds: 30 });
-    loop = new WorkerLoop(queue, new ExecutionRunner(db, new StepDispatcher([new LogStep()])), {
+    const handlers: StepHandler[] = [
+      new LogStep(),
+      { type: 'boom', run: () => Promise.reject(new Error('remote said no')) },
+      {
+        // Simulates a user cancelling while this step runs.
+        type: 'cancel',
+        run: async (_step, context) => {
+          await database.owner.query(`UPDATE executions SET status = 'CANCELLED' WHERE id = $1`, [
+            context.executionId,
+          ]);
+          return null;
+        },
+      },
+    ];
+    loop = new WorkerLoop(queue, new ExecutionRunner(db, new StepDispatcher(handlers)), {
       batchSize: 10,
       pollIntervalMs: 10,
     });
@@ -111,6 +126,59 @@ describe('workflow worker against PostgreSQL', () => {
     expect((await steps(seeded.executionId))[1]?.error).toMatchObject({
       code: 'STEP_TYPE_NOT_SUPPORTED',
     });
+    expect(await jobCount(seeded.executionId)).toBe(0);
+  });
+
+  it('records the error of a step whose handler throws', async () => {
+    const seeded = await database.seedExecution([
+      { id: 'call', name: 'Call', type: 'boom', config: {} },
+    ]);
+
+    await loop.tick();
+
+    expect(await steps(seeded.executionId)).toMatchObject([
+      {
+        status: 'FAILED',
+        attempts: 1,
+        error: { code: 'STEP_ERROR', message: 'remote said no' },
+      },
+    ]);
+    expect(await execution(seeded.executionId)).toMatchObject({ status: 'FAILED' });
+  });
+
+  it('fails a step that is missing from the workflow version', async () => {
+    const seeded = await database.seedExecution([log('known')]);
+    await database.owner.query(
+      `UPDATE step_executions SET position = 1 WHERE execution_id = $1 AND step_id = 'known'`,
+      [seeded.executionId],
+    );
+    await database.owner.query(
+      `INSERT INTO step_executions (organization_id, execution_id, step_id, position)
+       VALUES ($1, $2, 'ghost', 0)`,
+      [seeded.organizationId, seeded.executionId],
+    );
+
+    await loop.tick();
+
+    expect((await steps(seeded.executionId)).map((s) => [s.step_id, s.status])).toEqual([
+      ['ghost', 'FAILED'],
+      ['known', 'SKIPPED'],
+    ]);
+  });
+
+  it('stops before the next step when the execution was cancelled mid-run', async () => {
+    const seeded = await database.seedExecution([
+      { id: 'stop', name: 'Stop', type: 'cancel', config: {} },
+      log('after'),
+    ]);
+
+    await loop.tick();
+
+    expect(await execution(seeded.executionId)).toMatchObject({ status: 'CANCELLED' });
+    expect((await steps(seeded.executionId)).map((s) => [s.step_id, s.status])).toEqual([
+      ['stop', 'SUCCEEDED'],
+      ['after', 'PENDING'],
+    ]);
     expect(await jobCount(seeded.executionId)).toBe(0);
   });
 

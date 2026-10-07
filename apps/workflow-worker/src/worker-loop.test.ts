@@ -61,6 +61,27 @@ describe('WorkerLoop', () => {
     expect(queue.claim.mock.calls.length).toBe(claims);
   });
 
+  it('ignores a second start', async () => {
+    const { queue, runner } = fakes([]);
+    const loop = new WorkerLoop(queue, runner, options);
+
+    loop.start();
+    loop.start();
+    await loop.stop();
+
+    expect(queue.claim).toHaveBeenCalledTimes(1);
+  });
+
+  it('logs non-Error failures without crashing', async () => {
+    const { queue, runner } = fakes([[job('a')]]);
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors -- a library may reject with a string
+    runner.run.mockReturnValueOnce(Promise.reject('timeout'));
+    const loop = new WorkerLoop(queue, runner, options);
+
+    await expect(loop.tick()).resolves.toBe(1);
+    expect(queue.complete).not.toHaveBeenCalled();
+  });
+
   it('keeps polling after a failed claim', async () => {
     const { queue, runner } = fakes([[job('a')]]);
     queue.claim.mockRejectedValueOnce(new Error('connection refused'));
