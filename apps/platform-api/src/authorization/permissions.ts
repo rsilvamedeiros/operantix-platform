@@ -1,6 +1,7 @@
 import type { Role } from '../identity/identity.schema';
 
-export type Permission = 'workspace:read' | 'workspace:create' | 'workflow:read' | 'workflow:write';
+export type Permission =
+  'workspace:read' | 'workspace:create' | 'workflow:read' | 'workflow:write' | 'workflow:activate';
 
 const READ: Permission[] = ['workspace:read', 'workflow:read'];
 

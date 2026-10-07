@@ -33,3 +33,15 @@ describe('workflow permissions', () => {
     expect(hasPermission(role, 'workflow:write')).toBe(allowed);
   });
 });
+
+describe('workflow activation permission', () => {
+  it.each([
+    ['OWNER', true],
+    ['ADMIN', true],
+    ['DEVELOPER', true],
+    ['OPERATOR', true],
+    ['VIEWER', false],
+  ] as const)('lets %s activate workflows: %s', (role, allowed) => {
+    expect(hasPermission(role, 'workflow:activate')).toBe(allowed);
+  });
+});
