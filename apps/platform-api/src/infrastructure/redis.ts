@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { createClient } from 'redis';
 import type { AppConfig } from '../config/config';
 import type { ReadinessCheck } from '../health/readiness';
+import { errorMessage } from '../shared/error-message';
 
 const MAX_RECONNECT_DELAY_MS = 5_000;
 
@@ -43,8 +44,4 @@ export function redisReadinessCheck(client: RedisClient): ReadinessCheck {
       await client.ping();
     },
   };
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -32,6 +32,13 @@ class ProbeController {
     return { ok: true };
   }
 
+  // Misuse: reads the principal on a route that skips authentication.
+  @Public()
+  @Get('misused')
+  misused(@CurrentPrincipal() principal: Principal): Principal {
+    return principal;
+  }
+
   @Get('closed')
   closed(@CurrentPrincipal() principal: Principal): Principal {
     return principal;
@@ -97,6 +104,12 @@ describe('AuthGuard', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ subject: 'user-123' });
+  });
+
+  it('fails loudly when a public route reads the principal', async () => {
+    const res = await request(httpServer(app)).get('/probe/misused');
+
+    expect(res.status).toBe(500);
   });
 
   it('accepts the scheme case-insensitively', async () => {

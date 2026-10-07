@@ -89,9 +89,7 @@ describe('JwtAccessTokenVerifier', () => {
       JSON.stringify({ iss: ISSUER, aud: AUDIENCE, sub: 'user-123' }),
     ).toString('base64url');
 
-    await expect(verifier.verify(`${header}.${payload}.`)).rejects.toThrow(
-      InvalidAccessTokenError,
-    );
+    await expect(verifier.verify(`${header}.${payload}.`)).rejects.toThrow(InvalidAccessTokenError);
   });
 
   it('rejects a token without subject', async () => {
@@ -99,6 +97,18 @@ describe('JwtAccessTokenVerifier', () => {
       .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
       .setIssuer(ISSUER)
       .setAudience(AUDIENCE)
+      .setExpirationTime('5m')
+      .sign(signingKey);
+
+    await expect(verifier.verify(anonymous)).rejects.toThrow(InvalidAccessTokenError);
+  });
+
+  it('rejects a token with an empty subject', async () => {
+    const anonymous = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+      .setIssuer(ISSUER)
+      .setAudience(AUDIENCE)
+      .setSubject('')
       .setExpirationTime('5m')
       .sign(signingKey);
 

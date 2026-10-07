@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { createApp } from './app';
 import { loadConfig } from './config/config';
+import { errorMessage } from './shared/error-message';
 
 async function bootstrap(): Promise<void> {
   const config = loadConfig(process.env);
@@ -11,6 +12,6 @@ async function bootstrap(): Promise<void> {
 }
 
 bootstrap().catch((error: unknown) => {
-  Logger.error(error instanceof Error ? error.message : String(error), 'Bootstrap');
+  Logger.error(errorMessage(error), 'Bootstrap');
   process.exit(1);
 });

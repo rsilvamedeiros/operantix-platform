@@ -1,4 +1,5 @@
 import { type JWTVerifyGetKey, jwtVerify } from 'jose';
+import { errorMessage } from '../shared/error-message';
 
 export interface Principal {
   subject: string;
@@ -38,9 +39,7 @@ export class JwtAccessTokenVerifier implements AccessTokenVerifier {
     } catch (error) {
       if (error instanceof InvalidAccessTokenError) throw error;
       // jose's message says why (expired, bad signature...); it never contains the token.
-      throw new InvalidAccessTokenError(error instanceof Error ? error.message : 'invalid token', {
-        cause: error,
-      });
+      throw new InvalidAccessTokenError(errorMessage(error), { cause: error });
     }
   }
 }

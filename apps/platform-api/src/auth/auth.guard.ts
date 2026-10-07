@@ -10,6 +10,7 @@ import { Reflector } from '@nestjs/core';
 import type { AccessTokenVerifier } from './access-token-verifier';
 import { ACCESS_TOKEN_VERIFIER } from './auth.tokens';
 import type { AuthenticatedRequest } from './authenticated-request';
+import { errorMessage } from '../shared/error-message';
 import { IS_PUBLIC } from './public.decorator';
 
 const BEARER = /^Bearer (?<token>\S+)$/i;
@@ -41,9 +42,7 @@ export class AuthGuard implements CanActivate {
       return true;
     } catch (error) {
       // The reason stays server-side; clients only learn that authentication failed.
-      this.logger.warn(
-        `Rejected access token: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`Rejected access token: ${errorMessage(error)}`);
       throw unauthenticated();
     }
   }
