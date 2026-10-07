@@ -11,7 +11,7 @@ import type {
   ListExecutionsQuery,
   StartExecutionInput,
 } from './execution.dto';
-import { executions, stepExecutions } from './executions.schema';
+import { executionJobs, executions, stepExecutions } from './executions.schema';
 
 export class ExecutionNotFoundError extends Error {
   override name = 'ExecutionNotFoundError';
@@ -124,6 +124,9 @@ export class ExecutionsService {
           })),
         )
         .returning(stepView);
+      await tx
+        .insert(executionJobs)
+        .values({ organizationId: tenant.organizationId, executionId: created.id });
       return { execution: { ...created, steps }, created: true };
     });
   }
