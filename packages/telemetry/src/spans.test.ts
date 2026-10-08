@@ -38,17 +38,19 @@ describe('spans', () => {
   });
 
   it('traced records a thrown error, marks the span failed and rethrows', async () => {
-    await expect(
-      traced('work', {}, () => Promise.reject(new TypeError('boom'))),
-    ).rejects.toThrow('boom');
+    await expect(traced('work', {}, () => Promise.reject(new TypeError('boom')))).rejects.toThrow(
+      'boom',
+    );
     const [span] = exporter.getFinishedSpans();
     expect(span?.status.code).toBe(SpanStatusCode.ERROR);
     expect(span?.events.map((e) => e.name)).toContain('exception');
   });
 
   it('nests spans and carries kind and attributes', async () => {
-    await traced('outer', { kind: SpanKind.CONSUMER, attributes: { 'messaging.system': 'kafka' } }, () =>
-      traced('inner', {}, () => Promise.resolve()),
+    await traced(
+      'outer',
+      { kind: SpanKind.CONSUMER, attributes: { 'messaging.system': 'kafka' } },
+      () => traced('inner', {}, () => Promise.resolve()),
     );
     const spans = exporter.getFinishedSpans();
     const outer = spans.find((s) => s.name === 'outer');
@@ -68,7 +70,9 @@ describe('spans', () => {
       const carrier: Record<string, string> = {};
       injectTraceContext(carrier);
       const active = trace.getActiveSpan()?.spanContext();
-      expect(carrier.traceparent).toBe(`00-${active?.traceId}-${active?.spanId}-01`);
+      expect(carrier.traceparent).toBe(
+        `00-${String(active?.traceId)}-${String(active?.spanId)}-01`,
+      );
       const extracted = trace.getSpanContext(extractTraceContext(carrier));
       expect(extracted).toMatchObject({ traceId: active?.traceId, spanId: active?.spanId });
       return Promise.resolve();
