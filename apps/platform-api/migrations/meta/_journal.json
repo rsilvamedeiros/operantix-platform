@@ -183,6 +183,20 @@
       "when": 1791473584920,
       "tag": "0025_inbound_webhooks_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791473962464,
+      "tag": "0026_connections",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791473963391,
+      "tag": "0027_connections_rls",
+      "breakpoints": true
     }
   ]
 }

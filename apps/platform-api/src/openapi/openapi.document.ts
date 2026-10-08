@@ -8,6 +8,7 @@ import {
   createWorkflowVersionSchema,
 } from '../workflows/workflow.dto';
 import { startExecutionSchema } from '../executions/execution.dto';
+import { createConnectionSchema, replaceCredentialSchema } from '../integrations/connection.dto';
 import { createInboundWebhookSchema } from '../integrations/inbound-webhook.dto';
 import {
   createWebhookEndpointSchema,
@@ -404,6 +405,55 @@ const OPERATIONS: Operation[] = [
     path: `${ORG}/inbound-webhooks/{inboundWebhookId}`,
     summary: 'Delete an inbound webhook and its secret',
     tag: 'webhooks',
+    access: 'integration:write',
+    responses: { '204': noContent('Deleted') },
+  },
+  {
+    method: 'post',
+    path: `${ORG}/connections`,
+    summary: 'Store a credential for HTTP steps, bound to a base URL (never returned)',
+    tag: 'connections',
+    access: 'integration:write',
+    request: createConnectionSchema,
+    responses: {
+      '201': ok('Created', responses.connectionResponse),
+      '400': invalidBody,
+      '409': error('`CONNECTION_NAME_TAKEN`'),
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/connections`,
+    summary: 'Connections of the organization, by name',
+    tag: 'connections',
+    access: 'integration:read',
+    responses: { '200': ok('Connections', responses.connectionsResponse) },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/connections/{connectionId}`,
+    summary: 'A connection (never its credential)',
+    tag: 'connections',
+    access: 'integration:read',
+    responses: { '200': ok('Connection', responses.connectionResponse) },
+  },
+  {
+    method: 'put',
+    path: `${ORG}/connections/{connectionId}/credential`,
+    summary: 'Replace the credential at once',
+    tag: 'connections',
+    access: 'integration:write',
+    request: replaceCredentialSchema,
+    responses: {
+      '200': ok('Connection', responses.connectionResponse),
+      '400': invalidBody,
+    },
+  },
+  {
+    method: 'delete',
+    path: `${ORG}/connections/{connectionId}`,
+    summary: 'Delete a connection and its credential',
+    tag: 'connections',
     access: 'integration:write',
     responses: { '204': noContent('Deleted') },
   },

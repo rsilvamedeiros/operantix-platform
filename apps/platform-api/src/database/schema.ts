@@ -10,3 +10,4 @@ export * from '../integrations/secrets.schema';
 export * from '../integrations/webhook-endpoints.schema';
 export * from '../integrations/webhook-deliveries.schema';
 export * from '../integrations/inbound-webhooks.schema';
+export * from '../integrations/connections.schema';
