@@ -51,6 +51,9 @@ jobs:
       - name: Test messaging with coverage
         run: pnpm --filter @operantix/messaging test:coverage
 
+      - name: Test secrets with coverage
+        run: pnpm --filter @operantix/secrets test:coverage
+
       # Unit and integration tests (Testcontainers uses the runner's Docker) with coverage thresholds.
       - name: Test with coverage
         run: pnpm --filter @operantix/platform-api test:coverage
