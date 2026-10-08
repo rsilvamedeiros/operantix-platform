@@ -111,3 +111,23 @@ export function startTracing(
 export function isHealthProbe(request: Pick<IncomingMessage, 'url'>): boolean {
   return request.url?.startsWith('/health/') ?? false;
 }
+
+/**
+ * Entry point for a process's first import: starts tracing when configured and makes sure the
+ * batch of spans in flight is exported when the process is asked to stop.
+ */
+export function startTracingFromEnv(
+  env: Readonly<Record<string, string | undefined>>,
+  defaultServiceName: string,
+  options: StartTracingOptions = {},
+): TracingHandle | undefined {
+  const config = tracingConfigFromEnv(env, defaultServiceName);
+  if (config === undefined) return undefined;
+  const handle = startTracing(config, options);
+  const flush = (): void => {
+    void handle.shutdown();
+  };
+  process.once('SIGTERM', flush);
+  process.once('SIGINT', flush);
+  return handle;
+}

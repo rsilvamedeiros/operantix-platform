@@ -8,5 +8,10 @@ export type {
   CorrelationRequest,
   CorrelationResponse,
 } from './correlation-middleware';
-export { startTracing, tracingConfigFromEnv, TracingConfigError } from './tracing';
+export {
+  startTracing,
+  startTracingFromEnv,
+  tracingConfigFromEnv,
+  TracingConfigError,
+} from './tracing';
 export type { StartTracingOptions, TracingConfig, TracingHandle } from './tracing';
