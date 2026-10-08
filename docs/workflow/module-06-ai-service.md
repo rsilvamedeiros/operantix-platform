@@ -19,6 +19,7 @@ Introduzir Python service e um AI step de valor real.
 - token/cost telemetry
 - provider mock tests
 - prompt versioning
+- versioned eval dataset and runner (`classify-text@1`)
 
 ## Non-goals
 

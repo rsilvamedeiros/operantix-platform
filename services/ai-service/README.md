@@ -55,3 +55,9 @@ call with capability, prompt version, provider, model, outcome, latency and toke
 answers are never logged. Prompts are versioned files in `src/ai_service/prompts/`
 (`<capability>.v<version>.md`); a changed prompt is a new file. Tests use scripted providers; none
 calls a real model.
+
+## Evaluation
+
+`uv run python -m ai_service.evals classify-text` runs the versioned dataset in `evals/` through the
+configured provider and prints accuracy, schema validity, error counts, latency and cost as JSON. See
+`docs/ai/evaluation.md`.

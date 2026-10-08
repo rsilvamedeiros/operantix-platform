@@ -45,6 +45,9 @@ class LlmError(Exception):
 
     def __init__(self, detail: str) -> None:
         super().__init__(f"{self.code}: {detail}")
+        # Set by the gateway, so a failed call still reports what it took and cost.
+        self.latency_ms = 0
+        self.cost_usd: float | None = None
 
 
 class LlmUnavailableError(LlmError):

@@ -62,6 +62,14 @@ class LlmGateway:
         self._model = model
         self._clock = clock
 
+    @property
+    def model(self) -> str:
+        return self._model
+
+    @property
+    def provider_name(self) -> str:
+        return self._provider.name
+
     async def generate[T: BaseModel](
         self,
         prompt: Prompt,
@@ -86,7 +94,8 @@ class LlmGateway:
             result = await self._provider.complete(completion)
             parsed = _parse(result, output)
         except LlmError as error:
-            self._record(prompt, started, result, outcome=error.code)
+            failed = self._record(prompt, started, result, outcome=error.code)
+            error.latency_ms, error.cost_usd = failed.latency_ms, failed.cost_usd
             raise
         usage = self._record(prompt, started, result, outcome="ok")
         return Generation(
