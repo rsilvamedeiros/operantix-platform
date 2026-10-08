@@ -39,6 +39,8 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 
 Cada mudança de estado grava um evento em `execution_events` na mesma transação; a API expõe isso como timeline (`GET .../executions/{id}/timeline`, ver o README do `platform-api`).
 
+Na mesma transação, as mudanças do ciclo de vida também viram eventos de contrato (`@operantix/contracts`) em `outbox_events`: `execution.started`, `execution.step.started`, `execution.step.completed`, `execution.step.failed` (com `errorCode` e `retryable`, sem mensagem), `execution.completed` e `execution.failed`. Esperas e retomadas de `delay` ficam só na timeline. Cada linha guarda o envelope completo, o topic (`opx.execution.events.v1`) e a partition key (`executionId`). Até o OpenTelemetry (M07), o `traceId` é o `executionId` sem hífens, então todos os eventos de uma execução compartilham o trace. A publicação no Kafka é do relay (próxima entrega do M04).
+
 Regras:
 
 - Falha retentável (`retryable: true`: timeout, conexão recusada, `408/425/429/5xx`): enquanto o step tiver tentativas (`WORKER_STEP_MAX_ATTEMPTS`), ele volta a `PENDING` com o erro registrado e o job é reagendado com backoff exponencial (`WORKER_RETRY_BASE_DELAY_MS × 2^(tentativa-1)`, até 15 min). O reagendamento zera o contador de claims do job, que só conta crashes.
