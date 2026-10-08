@@ -1,4 +1,4 @@
-import './tracing';
+import './telemetry';
 import 'reflect-metadata';
 import { Logger } from '@nestjs/common';
 import { JsonLogger } from '@operantix/telemetry';

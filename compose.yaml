@@ -84,6 +84,15 @@ services:
     depends_on:
       - tempo
 
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    profiles: [observability]
+    command: ['--config.file=/etc/prometheus/prometheus.yaml', '--storage.tsdb.retention.time=24h']
+    volumes:
+      - ./infrastructure/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+    depends_on:
+      - otel-collector
+
   tempo:
     image: grafana/tempo:2.7.1
     profiles: [observability]
@@ -100,10 +109,12 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
     volumes:
       - ./infrastructure/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infrastructure/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
     ports:
       - '127.0.0.1:3001:3000'
     depends_on:
       - tempo
+      - prometheus
 
 # MongoDB is intentionally deferred to its roadmap module. Do not add it just
 # because it appears in the target architecture.
