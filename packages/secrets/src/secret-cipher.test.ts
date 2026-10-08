@@ -1,6 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { KeyringError, parseKeyring, SecretCipher, SecretDecryptionError } from './secret-cipher';
+import {
+  KeyringError,
+  parseKeyring,
+  SecretCipher,
+  secretContext,
+  SecretDecryptionError,
+} from './secret-cipher';
 
 const key = () => randomBytes(32).toString('base64');
 
@@ -87,5 +93,11 @@ describe('SecretCipher', () => {
     expect(() => cipher.decrypt({ ...sealed, keyId: 'gone' }, 'ctx')).toThrow(
       new SecretDecryptionError('UNKNOWN_KEY'),
     );
+  });
+});
+
+describe('secretContext', () => {
+  it('binds a stored secret to its organization and row', () => {
+    expect(secretContext('org-1', 'secret-1')).toBe('org-1/secret-1');
   });
 });

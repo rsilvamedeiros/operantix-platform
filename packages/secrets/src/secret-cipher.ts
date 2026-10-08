@@ -106,3 +106,11 @@ export class SecretCipher {
     return key;
   }
 }
+
+/**
+ * The context a stored secret is sealed with: its organization and row. Writers and readers
+ * must agree on it, so it lives here rather than in each workload.
+ */
+export function secretContext(organizationId: string, secretId: string): string {
+  return `${organizationId}/${secretId}`;
+}

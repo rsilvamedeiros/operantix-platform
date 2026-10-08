@@ -4,6 +4,7 @@ export {
   KeyringError,
   parseKeyring,
   SecretCipher,
+  secretContext,
   type SealedSecret,
   SecretDecryptionError,
 } from './secret-cipher';
