@@ -246,6 +246,84 @@ describe('executions API', () => {
     expect(missing.body).toMatchObject({ code: 'EXECUTION_NOT_FOUND' });
   });
 
+  describe('timeline', () => {
+    it('starts with the creation of the execution', async () => {
+      const id = await workflow('timeline', true);
+      const created = (await start(id, operator.sub, {}, 'timeline-key')).body as ExecutionBody;
+
+      const res = await request(httpServer(app))
+        .get(`${base}/executions/${created.id}/timeline`)
+        .set('Authorization', await as(viewer.sub));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({
+        data: [
+          {
+            type: 'execution.created',
+            stepId: null,
+            attempt: null,
+            details: { triggerType: 'manual', triggeredBy: operator.id },
+          },
+        ],
+      });
+    });
+
+    it('lists events in the order they happened', async () => {
+      const id = await workflow('timeline-order', true);
+      const created = (await start(id, operator.sub)).body as ExecutionBody;
+      // The worker appends these; here the owner stands in for it.
+      await database.ownerPool.query(
+        `INSERT INTO execution_events (organization_id, execution_id, type, step_id, attempt)
+         VALUES ($1, $2, 'execution.started', NULL, NULL), ($1, $2, 'step.started', 'wait', 1)`,
+        [acme, created.id],
+      );
+
+      const res = await request(httpServer(app))
+        .get(`${base}/executions/${created.id}/timeline`)
+        .set('Authorization', await as(viewer.sub));
+
+      expect((res.body as { data: { type: string }[] }).data.map((e) => e.type)).toEqual([
+        'execution.created',
+        'execution.started',
+        'step.started',
+      ]);
+    });
+
+    it('returns 404 for an execution of another tenant', async () => {
+      const id = await workflow('timeline-private', true);
+      const created = (await start(id, operator.sub)).body as ExecutionBody;
+
+      const res = await request(httpServer(app))
+        .get(`/api/v1/organizations/${globex}/executions/${created.id}/timeline`)
+        .set('Authorization', await as(outsider.sub));
+
+      expect(res.status).toBe(404);
+      expect(res.body).toMatchObject({ code: 'EXECUTION_NOT_FOUND' });
+    });
+
+    it('does not let anyone rewrite the timeline', async () => {
+      await expect(
+        database.ownerPool.query(`UPDATE execution_events SET type = 'forged'`),
+      ).rejects.toThrow(/append-only/);
+      await expect(database.ownerPool.query('DELETE FROM execution_events')).rejects.toThrow(
+        /append-only/,
+      );
+    });
+
+    it('goes away with its execution', async () => {
+      const id = await workflow('timeline-cascade', true);
+      const created = (await start(id, operator.sub)).body as ExecutionBody;
+
+      await database.ownerPool.query('DELETE FROM executions WHERE id = $1', [created.id]);
+
+      const { rowCount } = await database.ownerPool.query(
+        'SELECT 1 FROM execution_events WHERE execution_id = $1',
+        [created.id],
+      );
+      expect(rowCount).toBe(0);
+    });
+  });
+
   it('lists executions newest first with a cursor', async () => {
     const id = await workflow('paged', true);
     const ids: string[] = [];

@@ -250,6 +250,14 @@ const OPERATIONS: Operation[] = [
     access: 'execution:read',
     responses: { '200': ok('Execution', responses.executionDetailResponse) },
   },
+  {
+    method: 'get',
+    path: `${ORG}/executions/{executionId}/timeline`,
+    summary: 'What happened to an execution, oldest first (`execution.*` and `step.*` events)',
+    tag: 'executions',
+    access: 'execution:read',
+    responses: { '200': ok('Timeline', responses.executionTimelineResponse) },
+  },
 ];
 
 function responsesFor(operation: Operation): Record<string, Response> {

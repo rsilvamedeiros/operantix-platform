@@ -19,6 +19,7 @@ import { CurrentTenant } from '../tenancy/current-tenant.decorator';
 import type { TenantContext } from '../tenancy/tenant-context';
 import {
   type ExecutionDetailView,
+  type ExecutionEventView,
   type ExecutionPage,
   idempotencyKeySchema,
   type ListExecutionsQuery,
@@ -108,6 +109,15 @@ export class ExecutionsController {
     @Param('executionId', new UuidParamPipe(executionNotFound)) executionId: string,
   ): Promise<ExecutionDetailView> {
     return mapped(this.executions.get(tenant, executionId));
+  }
+
+  @RequirePermission('execution:read')
+  @Get('executions/:executionId/timeline')
+  timeline(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('executionId', new UuidParamPipe(executionNotFound)) executionId: string,
+  ): Promise<{ data: ExecutionEventView[] }> {
+    return mapped(this.executions.timeline(tenant, executionId));
   }
 
   @RequirePermission('execution:read')

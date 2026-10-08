@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { type Database, type Transaction, withTenant } from '../database';
 import {
+  executionEvents,
   executionJobs,
   executions,
   stepExecutions,
@@ -69,7 +70,7 @@ export class ExecutionRunner {
     if (job.attempts > job.maxAttempts) {
       this.logger.warn({ ...scope, attempts: job.attempts, msg: 'Execution ran out of attempts' });
       await tenant((tx) =>
-        finish(tx, job.executionId, 'FAILED', {
+        finish(tx, job, 'FAILED', {
           code: 'MAX_ATTEMPTS_EXCEEDED',
           message: `Execution was claimed ${String(job.attempts)} times without finishing`,
         }),
@@ -78,10 +79,12 @@ export class ExecutionRunner {
     }
 
     const definitionSteps = await tenant(async (tx) => {
-      await tx
+      const started = await tx
         .update(executions)
         .set({ status: 'RUNNING', startedAt: sql`now()` })
-        .where(and(eq(executions.id, job.executionId), eq(executions.status, 'PENDING')));
+        .where(and(eq(executions.id, job.executionId), eq(executions.status, 'PENDING')))
+        .returning({ id: executions.id });
+      if (started.length > 0) await record(tx, job, 'execution.started');
       const [version] = await tx
         .select({ definition: workflowVersions.definition })
         .from(workflowVersions)
@@ -132,9 +135,14 @@ export class ExecutionRunner {
           })
           .where(eq(stepExecutions.id, step.id))
           .returning({ attempts: stepExecutions.attempts, startedAt: stepExecutions.startedAt });
+        const attempt = started?.attempts ?? 1;
+        await record(tx, job, step.status === 'WAITING' ? 'step.resumed' : 'step.started', {
+          stepId: step.stepId,
+          attempt,
+        });
         return {
           status: row.status,
-          attempt: started?.attempts ?? 1,
+          attempt,
           startedAt: started?.startedAt ?? new Date(),
         };
       });
@@ -154,6 +162,11 @@ export class ExecutionRunner {
             .update(stepExecutions)
             .set({ status: 'WAITING' })
             .where(eq(stepExecutions.id, step.id));
+          await record(tx, job, 'step.waiting', {
+            stepId: step.stepId,
+            attempt: current.attempt,
+            details: { resumeAt: result.suspendedUntil.toISOString() },
+          });
           await this.reschedule(tx, job.id, result.suspendedUntil);
         });
         return 'RESCHEDULED';
@@ -181,7 +194,14 @@ export class ExecutionRunner {
             .update(stepExecutions)
             .set({ status: 'PENDING', error: { ...result.failure } })
             .where(eq(stepExecutions.id, step.id));
-          await this.reschedule(tx, job.id, new Date(Date.now() + delayMs));
+          const runAfter = new Date(Date.now() + delayMs);
+          const at = { stepId: step.stepId, attempt: current.attempt };
+          await record(tx, job, 'step.failed', { ...at, details: failureDetails(result.failure) });
+          await record(tx, job, 'step.retry_scheduled', {
+            ...at,
+            details: { runAfter: runAfter.toISOString() },
+          });
+          await this.reschedule(tx, job.id, runAfter);
         });
         return 'RESCHEDULED';
       }
@@ -198,7 +218,12 @@ export class ExecutionRunner {
             .update(stepExecutions)
             .set({ status: 'FAILED', error: { ...result.failure }, finishedAt: sql`now()` })
             .where(eq(stepExecutions.id, step.id));
-          await finish(tx, job.executionId, 'FAILED', {
+          await record(tx, job, 'step.failed', {
+            stepId: step.stepId,
+            attempt: current.attempt,
+            details: failureDetails(result.failure),
+          });
+          await finish(tx, job, 'FAILED', {
             code: 'STEP_FAILED',
             stepId: step.stepId,
             message: `Step "${step.stepId}" failed`,
@@ -207,15 +232,16 @@ export class ExecutionRunner {
         return 'FAILED';
       }
 
-      await tenant((tx) =>
-        tx
+      await tenant(async (tx) => {
+        await tx
           .update(stepExecutions)
           .set({ status: 'SUCCEEDED', output: result.output, error: null, finishedAt: sql`now()` })
-          .where(eq(stepExecutions.id, step.id)),
-      );
+          .where(eq(stepExecutions.id, step.id));
+        await record(tx, job, 'step.succeeded', { stepId: step.stepId, attempt: current.attempt });
+      });
     }
 
-    await tenant((tx) => finish(tx, job.executionId, 'SUCCEEDED', null));
+    await tenant((tx) => finish(tx, job, 'SUCCEEDED', null));
     this.logger.log({ ...scope, msg: 'Execution succeeded' });
     return 'SUCCEEDED';
   }
@@ -272,21 +298,56 @@ export class ExecutionRunner {
 /** Moves a non-terminal execution to a terminal state and skips its unfinished steps. */
 async function finish(
   tx: Transaction,
-  executionId: string,
+  job: ClaimedJob,
   status: 'SUCCEEDED' | 'FAILED',
   error: Record<string, unknown> | null,
 ): Promise<void> {
-  await tx
+  const finished = await tx
     .update(executions)
     .set({ status, error, finishedAt: sql`now()`, startedAt: sql`coalesce(started_at, now())` })
-    .where(and(eq(executions.id, executionId), inArray(executions.status, ['PENDING', 'RUNNING'])));
+    .where(
+      and(eq(executions.id, job.executionId), inArray(executions.status, ['PENDING', 'RUNNING'])),
+    )
+    .returning({ id: executions.id });
   await tx
     .update(stepExecutions)
     .set({ status: 'SKIPPED', finishedAt: sql`now()` })
     .where(
       and(
-        eq(stepExecutions.executionId, executionId),
-        inArray(stepExecutions.status, ['PENDING', 'RUNNING']),
+        eq(stepExecutions.executionId, job.executionId),
+        inArray(stepExecutions.status, ['PENDING', 'RUNNING', 'WAITING']),
       ),
     );
+  if (finished.length > 0) {
+    const code = error?.['code'];
+    await record(tx, job, status === 'SUCCEEDED' ? 'execution.succeeded' : 'execution.failed', {
+      details: typeof code === 'string' ? { code } : null,
+    });
+  }
+}
+
+/** Appends to the execution's timeline, in the transaction of the change it describes. */
+async function record(
+  tx: Transaction,
+  job: ClaimedJob,
+  type: string,
+  fields: {
+    stepId?: string;
+    attempt?: number;
+    details?: Record<string, unknown> | null;
+  } = {},
+): Promise<void> {
+  await tx.insert(executionEvents).values({
+    organizationId: job.organizationId,
+    executionId: job.executionId,
+    type,
+    stepId: fields.stepId ?? null,
+    attempt: fields.attempt ?? null,
+    details: fields.details ?? null,
+  });
+}
+
+/** The failure without its message, which may quote the destination. */
+function failureDetails(failure: StepFailure): Record<string, unknown> {
+  return { code: failure.code, retryable: failure.retryable };
 }

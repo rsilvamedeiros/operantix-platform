@@ -7,11 +7,12 @@ import type { TenantContext } from '../tenancy/tenant-context';
 import { workflows, workflowVersions } from '../workflows/workflows.schema';
 import type {
   ExecutionDetailView,
+  ExecutionEventView,
   ExecutionPage,
   ListExecutionsQuery,
   StartExecutionInput,
 } from './execution.dto';
-import { executionJobs, executions, stepExecutions } from './executions.schema';
+import { executionEvents, executionJobs, executions, stepExecutions } from './executions.schema';
 
 export class ExecutionNotFoundError extends Error {
   override name = 'ExecutionNotFoundError';
@@ -127,6 +128,12 @@ export class ExecutionsService {
       await tx
         .insert(executionJobs)
         .values({ organizationId: tenant.organizationId, executionId: created.id });
+      await tx.insert(executionEvents).values({
+        organizationId: tenant.organizationId,
+        executionId: created.id,
+        type: 'execution.created',
+        details: { triggerType: created.triggerType, triggeredBy: created.triggeredBy },
+      });
       return { execution: { ...created, steps }, created: true };
     });
   }
@@ -136,6 +143,29 @@ export class ExecutionsService {
       const found = await detail(tx, eq(executions.id, executionId));
       if (!found) throw new ExecutionNotFoundError(executionId);
       return found;
+    });
+  }
+
+  /** What happened to an execution, oldest first. */
+  timeline(tenant: TenantContext, executionId: string): Promise<{ data: ExecutionEventView[] }> {
+    return withTenant(this.db, tenant.organizationId, async (tx) => {
+      const [execution] = await tx
+        .select({ id: executions.id })
+        .from(executions)
+        .where(eq(executions.id, executionId));
+      if (!execution) throw new ExecutionNotFoundError(executionId);
+      const data = await tx
+        .select({
+          type: executionEvents.type,
+          stepId: executionEvents.stepId,
+          attempt: executionEvents.attempt,
+          details: executionEvents.details,
+          occurredAt: executionEvents.occurredAt,
+        })
+        .from(executionEvents)
+        .where(eq(executionEvents.executionId, executionId))
+        .orderBy(asc(executionEvents.id));
+      return { data };
     });
   }
 

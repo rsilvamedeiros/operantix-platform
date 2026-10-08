@@ -58,6 +58,16 @@ export const stepExecutions = pgTable('step_executions', {
   finishedAt: timestamp('finished_at', { withTimezone: true }),
 });
 
+/** Append-only: the worker inserts only (no SELECT grant). */
+export const executionEvents = pgTable('execution_events', {
+  organizationId: uuid('organization_id').notNull(),
+  executionId: uuid('execution_id').notNull(),
+  type: text('type').notNull(),
+  stepId: text('step_id'),
+  attempt: integer('attempt'),
+  details: jsonb('details').$type<Record<string, unknown>>(),
+});
+
 export const workflowVersions = pgTable('workflow_versions', {
   organizationId: uuid('organization_id').notNull(),
   workflowId: uuid('workflow_id').notNull(),

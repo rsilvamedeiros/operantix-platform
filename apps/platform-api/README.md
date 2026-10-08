@@ -36,6 +36,7 @@ A API de negócio fica sob `/api/v1` (`docs/api/versioning.md`). `/health/*` e `
 | `POST /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Inicia uma execução da versão ativa `{"input"}` (`execution:start`). Header opcional `Idempotency-Key`. | `201` execução com steps; `200` replay da mesma chave; `409 WORKFLOW_INACTIVE`; `409 IDEMPOTENCY_KEY_REUSED` |
 | `GET /api/v1/organizations/{organizationId}/workflows/{workflowId}/executions` | Execuções do workflow, da mais nova para a mais antiga, com `?limit=` (1 a 100, padrão 20) e `?cursor=` (`execution:read`). | `200 {"data","nextCursor"}`; `400 VALIDATION_FAILED` |
 | `GET /api/v1/organizations/{organizationId}/executions/{executionId}` | Execução com os steps na ordem da definição (`execution:read`). | `200`; `404 EXECUTION_NOT_FOUND` |
+| `GET /api/v1/organizations/{organizationId}/executions/{executionId}/timeline` | O que aconteceu com a execução, do mais antigo ao mais novo (`execution:read`). | `200 {"data":[{"type","stepId","attempt","details","occurredAt"}]}`; `404 EXECUTION_NOT_FOUND` |
 | `GET /health/ready` | Readiness: PostgreSQL (`SELECT 1`) e Redis (`PING`), cada um com timeout `HEALTH_CHECK_TIMEOUT_MS`. | `200` com todos `up`; `503` com o status de cada dependência. O motivo da falha vai só para o log. |
 
 O Redis conecta em background com reconexão exponencial (até 5 s), então logo após o boot o readiness pode ficar `503` até a conexão subir.
@@ -108,6 +109,8 @@ Iniciar uma execução congela a versão ativa (`workflowVersion`) e cria um `st
 
 Idempotência (`docs/api/idempotency.md`): com `Idempotency-Key`, a chave é única por workflow (índice único `(organization_id, workflow_id, idempotency_key)`) e guarda o SHA-256 do body canônico. Repetir a chave com o mesmo body devolve a primeira execução com `200`; com body diferente, `409 IDEMPOTENCY_KEY_REUSED`. Requisições concorrentes com a mesma chave usam `INSERT ... ON CONFLICT DO NOTHING`, então só uma cria a execução e as outras recebem a mesma.
 
+Timeline: `execution_events` é append-only (trigger rejeita `UPDATE`/`DELETE` diretos; apagar a execução leva os eventos junto). A API grava `execution.created` na transação do start; o worker grava, na mesma transação de cada mudança, `execution.started`, `step.started`, `step.resumed`, `step.waiting`, `step.succeeded`, `step.failed` (`details: {code, retryable}`, sem a mensagem), `step.retry_scheduled` (`details.runAfter`), `execution.succeeded` e `execution.failed` (`details.code`). O papel do worker só tem `INSERT` nessa tabela, sem leitura.
+
 A listagem usa keyset pagination em `(created_at desc, id desc)`. O cursor é opaco; um cursor inválido devolve `400`.
 
 ## Auditoria
@@ -140,7 +143,7 @@ Drizzle ORM com migrations SQL versionadas em `migrations/` (ADR-0017).
 - Tabelas com `organization_id` têm `FORCE ROW LEVEL SECURITY` e a policy `tenant_isolation`. Sem tenant definido, nenhuma linha é visível.
 - Todo acesso a dados de tenant passa por `withTenant(db, organizationId, fn)`, que abre uma transação e faz `set_config('app.organization_id', ..., true)`. O valor vale só para a transação, então não vaza entre conexões do pool.
 - `users` é global (uma pessoa pode estar em várias organizações) e não tem RLS. O registro é criado no primeiro `POST /api/v1/organizations` a partir do `sub` do token; `email` e `name` vêm do token quando presentes.
-- `operantix_worker` é o papel do `workflow-worker` (ADR-0018, ADR-0019). Ele vê a fila `execution_jobs` de todos os tenants (policy `worker_queue`), lê e atualiza execuções e steps só dentro de `withTenant` e não tem acesso às outras tabelas. A migration cria o papel sem `LOGIN`; no compose, `init/20-worker-role.sh` define `LOGIN` e senha.
+- `operantix_worker` é o papel do `workflow-worker` (ADR-0018, ADR-0019). Ele vê a fila `execution_jobs` de todos os tenants (policy `worker_queue`), lê e atualiza execuções e steps só dentro de `withTenant`, só insere em `execution_events` e não tem acesso às outras tabelas. A migration cria o papel sem `LOGIN`; no compose, `init/20-worker-role.sh` define `LOGIN` e senha.
 - `withUser(db, userId, fn)` abre um escopo só de leitura em que o usuário vê as próprias memberships e as organizações a que pertence, em todos os tenants (policies `member_reads_own`, `FOR SELECT`). Escritas continuam exigindo `withTenant`.
 
 Para mudar o schema: edite `src/**/*.schema.ts`, rode `pnpm --filter @operantix/platform-api db:generate` e revise o SQL gerado. Policies e funções vão em migration custom (`drizzle-kit generate --custom`).
