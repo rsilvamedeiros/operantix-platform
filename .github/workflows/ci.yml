@@ -66,3 +66,36 @@ jobs:
 
       - name: Test integration worker with coverage
         run: pnpm --filter @operantix/integration-worker test:coverage
+
+  python:
+    name: Python quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: services/ai-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/ai-service/uv.lock
+
+      # uv installs the Python version pyproject.toml requires.
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Format
+        run: uv run ruff format --check
+
+      - name: Lint
+        run: uv run ruff check
+
+      - name: Typecheck
+        run: uv run mypy
+
+      - name: Test with coverage
+        run: uv run pytest --cov

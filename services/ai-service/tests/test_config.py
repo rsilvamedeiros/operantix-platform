@@ -25,7 +25,9 @@ def test_reads_the_environment() -> None:
     ("name", "value"),
     [("AI_SERVICE_PORT", "0"), ("AI_SERVICE_ENV", "staging"), ("AI_SERVICE_LOG_LEVEL", "LOUD")],
 )
-def test_rejects_invalid_values_naming_the_variable_but_not_the_value(name: str, value: str) -> None:
+def test_rejects_invalid_values_naming_the_variable_but_not_the_value(
+    name: str, value: str
+) -> None:
     with pytest.raises(ConfigError) as error:
         load_settings({name: value})
 
