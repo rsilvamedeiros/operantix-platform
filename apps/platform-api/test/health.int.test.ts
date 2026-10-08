@@ -7,6 +7,7 @@ import request from 'supertest';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/config/config';
+import { testKeyring } from './support/secrets';
 
 const httpServer = (app: INestApplication): Server => app.getHttpServer() as Server;
 
@@ -75,6 +76,7 @@ describe('health endpoints against real dependencies', () => {
         audience: 'operantix-api',
         jwksUri: 'https://auth.operantix.test/.well-known/jwks.json',
       },
+      secrets: { keyring: testKeyring() },
     };
   }
 

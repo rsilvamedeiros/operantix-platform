@@ -61,3 +61,16 @@ describe('execution permissions', () => {
     expect(hasPermission(role, 'execution:start')).toBe(allowed);
   });
 });
+
+describe('integration permissions', () => {
+  it.each([
+    ['OWNER', true, true],
+    ['ADMIN', true, true],
+    ['DEVELOPER', true, true],
+    ['OPERATOR', true, false],
+    ['VIEWER', false, false],
+  ] as const)('lets %s read integrations: %s, manage them: %s', (role, read, write) => {
+    expect(hasPermission(role, 'integration:read')).toBe(read);
+    expect(hasPermission(role, 'integration:write')).toBe(write);
+  });
+});

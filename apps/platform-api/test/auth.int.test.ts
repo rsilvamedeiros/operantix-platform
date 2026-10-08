@@ -8,6 +8,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../src/app';
 import type { AppConfig } from '../src/config/config';
+import { testKeyring } from './support/secrets';
 
 const httpServer = (app: INestApplication): Server => app.getHttpServer() as Server;
 
@@ -51,6 +52,7 @@ describe('authentication against a JWKS endpoint', () => {
         audience: AUDIENCE,
         jwksUri: `http://127.0.0.1:${String(port)}/jwks.json`,
       },
+      secrets: { keyring: testKeyring() },
     };
     app = await createApp(config, { logger: false });
     await app.init();

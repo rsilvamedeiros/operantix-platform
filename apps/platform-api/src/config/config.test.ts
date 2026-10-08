@@ -1,9 +1,10 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { ConfigValidationError, loadConfig } from './config';
 
 // Generated per run so no credential-looking literal lives in the repo.
 const dbPassword = randomUUID();
+const encryptionKey = randomBytes(32).toString('base64');
 
 const validEnv = {
   DATABASE_HOST: 'db.internal',
@@ -14,6 +15,7 @@ const validEnv = {
   AUTH_ISSUER: 'https://auth.operantix.test/',
   AUTH_AUDIENCE: 'operantix-api',
   AUTH_JWKS_URI: 'https://auth.operantix.test/.well-known/jwks.json',
+  SECRETS_ENCRYPTION_KEYS: `k1:${encryptionKey}`,
 };
 
 describe('loadConfig', () => {
@@ -36,6 +38,9 @@ describe('loadConfig', () => {
         issuer: 'https://auth.operantix.test/',
         audience: 'operantix-api',
         jwksUri: 'https://auth.operantix.test/.well-known/jwks.json',
+      },
+      secrets: {
+        keyring: { active: 'k1', keys: new Map([['k1', Buffer.from(encryptionKey, 'base64')]]) },
       },
     });
   });
@@ -76,6 +81,22 @@ describe('loadConfig', () => {
     const { AUTH_AUDIENCE: _omitted, ...env } = validEnv;
 
     expect(() => loadConfig(env)).toThrow(/AUTH_AUDIENCE/);
+  });
+
+  it('requires a valid secrets keyring and never echoes it', () => {
+    const { SECRETS_ENCRYPTION_KEYS: _omitted, ...env } = validEnv;
+    const short = `k1:${randomBytes(8).toString('base64')}`;
+
+    expect(() => loadConfig(env)).toThrow(/SECRETS_ENCRYPTION_KEYS/);
+    expect(() => loadConfig({ ...validEnv, SECRETS_ENCRYPTION_KEYS: short })).toThrow(
+      ConfigValidationError,
+    );
+    try {
+      loadConfig({ ...validEnv, SECRETS_ENCRYPTION_KEYS: short });
+    } catch (error) {
+      expect(String(error)).toMatch(/SECRETS_ENCRYPTION_KEYS/);
+      expect(String(error)).not.toContain(short.slice(3));
+    }
   });
 
   it('never includes variable values in the error message', () => {
