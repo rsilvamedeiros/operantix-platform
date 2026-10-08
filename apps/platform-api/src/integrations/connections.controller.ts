@@ -23,6 +23,7 @@ import {
   replaceCredentialSchema,
 } from './connection.dto';
 import {
+  ConnectionInUseError,
   ConnectionNameTakenError,
   ConnectionNotFoundError,
   ConnectionsService,
@@ -37,6 +38,12 @@ async function mapped<T>(work: Promise<T>): Promise<T> {
     return await work;
   } catch (error) {
     if (error instanceof ConnectionNotFoundError) throw connectionNotFound();
+    if (error instanceof ConnectionInUseError) {
+      throw new ConflictException({
+        code: 'CONNECTION_IN_USE',
+        message: 'An active workflow version uses this connection',
+      });
+    }
     if (error instanceof ConnectionNameTakenError) {
       throw new ConflictException({
         code: 'CONNECTION_NAME_TAKEN',

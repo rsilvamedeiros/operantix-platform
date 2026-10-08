@@ -1,4 +1,5 @@
 import { hostname } from 'node:os';
+import { type Keyring, KeyringError, parseKeyring } from '@operantix/secrets';
 import { z } from 'zod';
 
 const port = z.coerce.number().int().min(1).max(65535);
@@ -22,6 +23,8 @@ const EnvSchema = z
     WORKER_HTTP_MAX_RESPONSE_BYTES: positive.max(1_048_576).default(65_536),
     WORKER_STEP_MAX_ATTEMPTS: positive.max(10).default(3),
     WORKER_RETRY_BASE_DELAY_MS: positive.default(2_000),
+    // Opens connection credentials for HTTP steps (ADR-0025); same keyring as platform-api.
+    SECRETS_ENCRYPTION_KEYS: z.string().min(1),
   })
   .refine(
     (e) => !(e.NODE_ENV === 'production' && e.WORKER_HTTP_ALLOW_PRIVATE_NETWORKS === 'true'),
@@ -44,6 +47,7 @@ export interface WorkerConfig {
   queue: { batchSize: number; pollIntervalMs: number; leaseSeconds: number };
   http: { timeoutMs: number; allowPrivateNetworks: boolean; maxResponseBytes: number };
   retry: { maxStepAttempts: number; baseDelayMs: number };
+  secrets: { keyring: Keyring };
 }
 
 export class ConfigValidationError extends Error {
@@ -59,6 +63,16 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
   }
 
   const e = parsed.data;
+  let keyring: Keyring;
+  try {
+    keyring = parseKeyring(e.SECRETS_ENCRYPTION_KEYS);
+  } catch (error) {
+    if (!(error instanceof KeyringError)) throw error;
+    // KeyringError messages name entries and rules, never key material.
+    throw new ConfigValidationError(
+      `Invalid environment configuration: SECRETS_ENCRYPTION_KEYS: ${error.message}`,
+    );
+  }
   return {
     env: e.NODE_ENV,
     workerId: e.WORKER_ID ?? `${hostname()}-${String(process.pid)}`,
@@ -83,5 +97,6 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
       maxStepAttempts: e.WORKER_STEP_MAX_ATTEMPTS,
       baseDelayMs: e.WORKER_RETRY_BASE_DELAY_MS,
     },
+    secrets: { keyring },
   };
 }

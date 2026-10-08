@@ -75,6 +75,21 @@ describe('workflowDefinitionSchema', () => {
     expect(issuesOf({ ...valid, steps })).toEqual(['steps.0.config.seconds']);
   });
 
+  it('lets an HTTP step name a connection by id', () => {
+    const withConnection = (connectionId: unknown) => ({
+      ...valid,
+      steps: [
+        {
+          ...valid.steps[0],
+          config: { method: 'GET', url: 'https://status.example.test/api', connectionId },
+        },
+      ],
+    });
+
+    expect(issuesOf(withConnection('3f2c1b0a-9e8d-4c7b-8a6f-5e4d3c2b1a09'))).toEqual([]);
+    expect(issuesOf(withConnection('crm'))).toEqual(['steps.0.config.connectionId']);
+  });
+
   it('only allows http and https URLs in HTTP steps', () => {
     const steps = [
       {

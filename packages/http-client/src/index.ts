@@ -1,3 +1,4 @@
+export { isWithinBaseUrl } from './base-url';
 export { isBlockedAddress } from './destination-policy';
 export {
   guardedLookup,

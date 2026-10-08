@@ -5,6 +5,7 @@ import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import type { WorkflowStep } from '../../src/engine.schema';
+import { endPool } from './end-pool';
 
 // platform-api owns the schema; the worker is tested against its real migrations.
 const MIGRATIONS = resolve(__dirname, '../../../platform-api/migrations');
@@ -128,9 +129,9 @@ export async function startEngineDatabase(): Promise<EngineDatabase> {
       return { organizationId, executionId: execution.id, jobId: job.id };
     },
     stop: async () => {
-      await worker.end();
-      await relay.end();
-      await owner.end();
+      await endPool(worker);
+      await endPool(relay);
+      await endPool(owner);
       await container.stop();
     },
   };

@@ -1393,7 +1393,12 @@
                                         "type": "string"
                                       }
                                     },
-                                    "body": {}
+                                    "body": {},
+                                    "connectionId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    }
                                   },
                                   "required": [
                                     "method",
@@ -1845,7 +1850,12 @@
                                           "type": "string"
                                         }
                                       },
-                                      "body": {}
+                                      "body": {},
+                                      "connectionId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
                                     },
                                     "required": [
                                       "method",
@@ -2202,7 +2212,12 @@
                                         "type": "string"
                                       }
                                     },
-                                    "body": {}
+                                    "body": {},
+                                    "connectionId": {
+                                      "type": "string",
+                                      "format": "uuid",
+                                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                    }
                                   },
                                   "required": [
                                     "method",
@@ -2441,7 +2456,12 @@
                                           "type": "string"
                                         }
                                       },
-                                      "body": {}
+                                      "body": {},
+                                      "connectionId": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                      }
                                     },
                                     "required": [
                                       "method",
@@ -8123,6 +8143,36 @@
           },
           "404": {
             "description": "`ORGANIZATION_NOT_FOUND` (not a member, or no such organization) or the addressed resource does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`CONNECTION_IN_USE`: an active workflow version uses it",
             "content": {
               "application/json": {
                 "schema": {
