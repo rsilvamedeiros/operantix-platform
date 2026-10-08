@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "start": "node --enable-source-maps dist/main.js",
+    "start:relay": "node --enable-source-maps dist/relay-main.js",
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --project unit",

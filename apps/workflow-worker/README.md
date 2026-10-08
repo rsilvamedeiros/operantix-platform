@@ -39,7 +39,7 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 
 Cada mudança de estado grava um evento em `execution_events` na mesma transação; a API expõe isso como timeline (`GET .../executions/{id}/timeline`, ver o README do `platform-api`).
 
-Na mesma transação, as mudanças do ciclo de vida também viram eventos de contrato (`@operantix/contracts`) em `outbox_events`: `execution.started`, `execution.step.started`, `execution.step.completed`, `execution.step.failed` (com `errorCode` e `retryable`, sem mensagem), `execution.completed` e `execution.failed`. Esperas e retomadas de `delay` ficam só na timeline. Cada linha guarda o envelope completo, o topic (`opx.execution.events.v1`) e a partition key (`executionId`). Até o OpenTelemetry (M07), o `traceId` é o `executionId` sem hífens, então todos os eventos de uma execução compartilham o trace. A publicação no Kafka é do relay (próxima entrega do M04).
+Na mesma transação, as mudanças do ciclo de vida também viram eventos de contrato (`@operantix/contracts`) em `outbox_events`: `execution.started`, `execution.step.started`, `execution.step.completed`, `execution.step.failed` (com `errorCode` e `retryable`, sem mensagem), `execution.completed` e `execution.failed`. Esperas e retomadas de `delay` ficam só na timeline. Cada linha guarda o envelope completo, o topic (`opx.execution.events.v1`) e a partition key (`executionId`). Até o OpenTelemetry (M07), o `traceId` é o `executionId` sem hífens, então todos os eventos de uma execução compartilham o trace. A publicação no Kafka é do relay da outbox (abaixo).
 
 Regras:
 
@@ -48,6 +48,35 @@ Regras:
 - Job com mais claims que `max_attempts` (padrão 5): a execução fica `FAILED` com `MAX_ATTEMPTS_EXCEEDED`. Isso evita que uma execução que derruba o worker seja tentada para sempre.
 - Execução cancelada: o worker para antes do próximo step.
 - Shutdown (`SIGTERM`/`SIGINT`): para de buscar jobs e termina o lote em andamento.
+
+## Relay da outbox
+
+Segundo entrypoint do mesmo app (ADR-0021), rodado como processo próprio:
+
+```bash
+docker compose up -d postgres kafka kafka-init
+pnpm --filter @operantix/workflow-worker build
+pnpm --filter @operantix/workflow-worker start:relay
+```
+
+- Conecta como `operantix_relay`, que só lê, marca e apaga linhas de `outbox_events`.
+- Só uma instância publica por vez: a que tem o advisory lock `operantix:outbox-relay`. As outras ficam em standby e assumem quando a conexão do líder cai.
+- A cada tick, publica até `RELAY_BATCH_SIZE` linhas não publicadas em ordem de `id` e marca `published_at` depois do ack do broker. Se o broker recusar, nada é marcado e o lote volta no próximo tick. Um crash entre publicar e marcar reenvia o lote (at-least-once); consumers deduplicam por `eventId`.
+- Headers de cada mensagem: `event-id`, `event-type`, `event-version` e `traceparent` (W3C, com o `traceId` do evento).
+- Linhas publicadas há mais de `RELAY_RETENTION_HOURS` são apagadas a cada `RELAY_CLEANUP_INTERVAL_MS`.
+- Sobe mesmo com banco ou Kafka fora do ar: cada tick falho é logado e repetido.
+
+| Variável | Padrão |
+| --- | --- |
+| `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME` | obrigatórias (porta `5432`) |
+| `RELAY_DATABASE_USER`, `RELAY_DATABASE_PASSWORD` | obrigatórias (`operantix_relay`) |
+| `KAFKA_BROKERS` | obrigatória, lista `host:porta` separada por vírgula |
+| `KAFKA_CLIENT_ID` | `operantix-outbox-relay` |
+| `RELAY_BATCH_SIZE` | `100` (máx. 1000) |
+| `RELAY_POLL_INTERVAL_MS` | `500` |
+| `RELAY_DELIVERY_TIMEOUT_MS` | `10000` |
+| `RELAY_RETENTION_HOURS` | `72` |
+| `RELAY_CLEANUP_INTERVAL_MS` | `60000` |
 
 ## Steps
 

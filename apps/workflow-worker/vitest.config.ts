@@ -26,6 +26,7 @@ export default defineConfig({
       exclude: [
         'src/**/*.test.ts',
         'src/main.ts',
+        'src/relay-main.ts',
         // Declarative table definitions; exercised by the integration tests.
         'src/**/*.schema.ts',
       ],

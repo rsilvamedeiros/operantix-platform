@@ -66,6 +66,35 @@ describe('Kafka event publisher', () => {
     ).rejects.toThrow();
   });
 
+  it('connects on the first publish and tolerates repeated connects', async () => {
+    await kafka.createTopic('test.lazy.v1');
+    const lazy = new KafkaEventPublisher({
+      brokers: kafka.brokers,
+      clientId: 'lazy-test',
+      deliveryTimeoutMs: 5_000,
+    });
+
+    try {
+      await lazy.publish([{ topic: 'test.lazy.v1', key: 'k', value: 'v', headers: {} }]);
+      await lazy.connect();
+      await lazy.connect();
+    } finally {
+      await lazy.disconnect();
+    }
+
+    expect((await kafka.consume('test.lazy.v1', 1)).map((m) => String(m.value))).toEqual(['v']);
+  });
+
+  it('disconnects a publisher that never connected', async () => {
+    const idle = new KafkaEventPublisher({
+      brokers: kafka.brokers,
+      clientId: 'idle-test',
+      deliveryTimeoutMs: 5_000,
+    });
+
+    await expect(idle.disconnect()).resolves.toBeUndefined();
+  });
+
   it('accepts an empty batch without calling the broker', async () => {
     await expect(publisher.publish([])).resolves.toBeUndefined();
   });

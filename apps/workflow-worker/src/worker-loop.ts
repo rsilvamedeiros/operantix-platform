@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { ExecutionOutcome } from './execution/execution-runner';
+import { PollingLoop, type PollingLoopOptions } from './polling-loop';
 import type { ClaimedJob } from './queue/job-queue';
 
 export interface JobSource {
@@ -11,10 +12,7 @@ export interface JobRunner {
   run(job: ClaimedJob): Promise<ExecutionOutcome>;
 }
 
-export interface WorkerLoopOptions {
-  batchSize: number;
-  pollIntervalMs: number;
-}
+export type WorkerLoopOptions = PollingLoopOptions;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -26,15 +24,15 @@ function message(error: unknown): string {
  */
 export class WorkerLoop {
   private readonly logger = new Logger(WorkerLoop.name);
-  private running = false;
-  private current: Promise<void> | undefined;
-  private wake: (() => void) | undefined;
+  private readonly polling: PollingLoop;
 
   constructor(
     private readonly queue: JobSource,
     private readonly runner: JobRunner,
     private readonly options: WorkerLoopOptions,
-  ) {}
+  ) {
+    this.polling = new PollingLoop(WorkerLoop.name, () => this.tick(), options);
+  }
 
   /** Claims one batch and runs it; returns how many jobs were claimed. */
   async tick(): Promise<number> {
@@ -62,43 +60,11 @@ export class WorkerLoop {
   }
 
   start(): void {
-    if (this.running) return;
-    this.running = true;
-    this.current = this.poll();
+    this.polling.start();
   }
 
   /** Stops polling and waits for the batch in flight. */
   async stop(): Promise<void> {
-    this.running = false;
-    this.wake?.();
-    await this.current;
-  }
-
-  private async poll(): Promise<void> {
-    while (this.running) {
-      let claimed = 0;
-      try {
-        claimed = await this.tick();
-      } catch (error) {
-        this.logger.error({ msg: `Claim failed: ${message(error)}` });
-      }
-      // A full batch suggests more work is waiting; otherwise sleep until the next poll.
-      if (claimed < this.options.batchSize && this.isRunning()) await this.sleep();
-    }
-  }
-
-  /** Read through a method: stop() flips the flag while poll() awaits, which narrowing misses. */
-  private isRunning(): boolean {
-    return this.running;
-  }
-
-  private sleep(): Promise<void> {
-    return new Promise((resolve) => {
-      const timer = setTimeout(resolve, this.options.pollIntervalMs);
-      this.wake = () => {
-        clearTimeout(timer);
-        resolve();
-      };
-    });
+    await this.polling.stop();
   }
 }

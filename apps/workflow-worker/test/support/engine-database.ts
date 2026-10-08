@@ -14,6 +14,8 @@ export interface EngineDatabase {
   owner: Pool;
   /** Pool of the worker role, which RLS and its grants apply to. */
   worker: Pool;
+  /** Pool of the outbox relay role. */
+  relay: Pool;
   seedExecution(steps: WorkflowStep[], options?: SeedOptions): Promise<SeededExecution>;
   stop(): Promise<void>;
 }
@@ -49,6 +51,15 @@ export async function startEngineDatabase(): Promise<EngineDatabase> {
     password,
   });
 
+  await owner.query(`ALTER ROLE operantix_relay LOGIN PASSWORD '${password}'`);
+  const relay = new Pool({
+    host: container.getHost(),
+    port: container.getPort(),
+    database: container.getDatabase(),
+    user: 'operantix_relay',
+    password,
+  });
+
   const creator = randomUUID();
   await owner.query(`INSERT INTO users (id, auth_subject) VALUES ($1, 'auth|seed')`, [creator]);
   const organizations = new Set<string>();
@@ -56,6 +67,7 @@ export async function startEngineDatabase(): Promise<EngineDatabase> {
   return {
     owner,
     worker,
+    relay,
     seedExecution: async (steps, options = {}) => {
       const organizationId = options.organizationId ?? randomUUID();
       if (!organizations.has(organizationId)) {
@@ -117,6 +129,7 @@ export async function startEngineDatabase(): Promise<EngineDatabase> {
     },
     stop: async () => {
       await worker.end();
+      await relay.end();
       await owner.end();
       await container.stop();
     },
