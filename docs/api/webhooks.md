@@ -46,3 +46,23 @@ Sob `/api/v1/organizations/{organizationId}/webhook-endpoints/{endpointId}`:
 - `PUT /status` com `{"status":"ACTIVE"|"DISABLED"}`: reativar zera `consecutiveFailures`. Repetir o status atual não muda nada.
 
 Ler exige `integration:read`; reenviar e mudar status, `integration:write`. Reenvio e mudança de status são auditados (`webhook_delivery.retried`, `webhook_endpoint.enabled`, `webhook_endpoint.disabled`).
+
+## Inbound (implementado)
+
+Um inbound webhook é uma URL assinada que inicia um workflow (ADR-0024). Quem tem `integration:write` cria em `POST /api/v1/organizations/{organizationId}/inbound-webhooks` com `{"workflowId": "...", "description": "..."}`. A resposta traz `path` e `signingSecret` (`whsec_...`), que aparece só agora e em `POST .../{inboundWebhookId}/rotate-secret`. `GET` lista e lê, sem o secret; `DELETE` apaga o webhook e o secret. Criar, rotacionar e apagar são auditados.
+
+O remetente envia:
+
+```http
+POST /hooks/v1/<organizationId>/<inboundWebhookId>
+Content-Type: application/json
+Idempotency-Key: <id único do evento no remetente>
+Operantix-Signature: t=1791460000,v1=<64 caracteres hex>
+
+{ "lead": { "email": "..." } }
+```
+
+- A assinatura é a mesma da saída: `HMAC-SHA256(signingSecret, "<t>.<corpo cru>")` em hex, com `t` a no máximo 5 minutos do relógio do servidor. Mais de um `v1` pode ir no header; um válido basta.
+- O corpo precisa ser um objeto JSON de até 100 KiB e vira o `input` da execução, com `triggerType: "webhook"`.
+- `202 {"executionId": "..."}` inicia a execução. Repetir a mesma `Idempotency-Key` com o mesmo corpo devolve `200` com a mesma execução; com outro corpo, `409 IDEMPOTENCY_KEY_REUSED`.
+- `401 WEBHOOK_SIGNATURE_INVALID` para assinatura ausente, inválida ou fora da janela, sem dizer qual. `404 INBOUND_WEBHOOK_NOT_FOUND` para webhook ou organização desconhecidos. `409 WORKFLOW_INACTIVE` se o workflow não tem versão ativa. `415 UNSUPPORTED_MEDIA_TYPE` se não for JSON.

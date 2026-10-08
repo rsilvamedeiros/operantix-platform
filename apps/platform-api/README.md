@@ -123,6 +123,10 @@ Uma organização registra para onde seus eventos de execução vão (`POST /api
 
 O secret fica em `secrets`, cifrado com AES-256-GCM pelo keyring de `SECRETS_ENCRYPTION_KEYS` e preso ao tenant e à linha (ADR-0022). A API só cifra. Viewers não veem endpoints, porque URLs podem carregar tokens; operators leem, mas não alteram. A entrega dos eventos é do integration worker.
 
+## Inbound webhooks
+
+`/api/v1/organizations/{organizationId}/inbound-webhooks` cria, lista, lê, rotaciona e apaga URLs assinadas que iniciam um workflow (`integration:read` para ler, `integration:write` para o resto). A rota pública `POST /hooks/v1/{organizationId}/{inboundWebhookId}` não usa token: verifica `Operantix-Signature` sobre o corpo cru (o app mantém `rawBody`), exige `Idempotency-Key` e inicia a execução com `triggerType: "webhook"` (ADR-0024, `docs/api/webhooks.md`). É o único lugar em que a API abre um secret, e só do tipo `WEBHOOK_INBOUND`.
+
 ## Auditoria
 
 `recordAudit(tx, tenant, event)` grava em `audit_entries` na mesma transação da mudança, então a entrada existe se e somente se a mudança foi commitada. A tabela tem RLS por tenant e um trigger que rejeita `UPDATE` e `DELETE` (append-only). Ações seguem `<recurso>.<verbo no passado>`, ex.: `workspace.created`.
