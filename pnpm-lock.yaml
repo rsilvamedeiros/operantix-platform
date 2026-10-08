@@ -276,6 +276,9 @@ importers:
       '@confluentinc/kafka-javascript':
         specifier: ^1.11.0
         version: 1.11.0
+      '@opentelemetry/api':
+        specifier: ^1.9.1
+        version: 1.9.1
       '@operantix/contracts':
         specifier: workspace:*
         version: link:../contracts
@@ -283,9 +286,6 @@ importers:
         specifier: workspace:*
         version: link:../telemetry
     devDependencies:
-      '@opentelemetry/api':
-        specifier: ^1.9.1
-        version: 1.9.1
       '@opentelemetry/sdk-trace-base':
         specifier: ^2.12.0
         version: 2.12.0(@opentelemetry/api@1.9.1)
