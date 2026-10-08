@@ -184,6 +184,9 @@ importers:
       '@operantix/messaging':
         specifier: workspace:*
         version: link:../../packages/messaging
+      '@operantix/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@types/pg@8.23.1)(pg@8.23.1)

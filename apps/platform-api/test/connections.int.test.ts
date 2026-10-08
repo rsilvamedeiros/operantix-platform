@@ -8,7 +8,7 @@ import { createApp } from '../src/app';
 import type { AppConfig } from '../src/config/config';
 import { createDatabase } from '../src/database/database';
 import { memberships, users } from '../src/identity/identity.schema';
-import { organizations } from '../src/organizations/organizations.schema';
+import { organizations, workspaces } from '../src/organizations/organizations.schema';
 import { AUDIENCE, ISSUER, type JwksIssuer, startJwksIssuer } from './support/jwks-issuer';
 import { testKeyring } from './support/secrets';
 import { startTenancyDatabase, type TenancyDatabase } from './support/tenancy-database';
@@ -28,6 +28,7 @@ describe('connections API', () => {
   let app: INestApplication;
   const acme = randomUUID();
   const globex = randomUUID();
+  const production = randomUUID();
   const developer = { id: randomUUID(), sub: 'auth|dev' };
   const operator = { id: randomUUID(), sub: 'auth|operator' };
   const outsider = { id: randomUUID(), sub: 'auth|outsider' };
@@ -39,6 +40,9 @@ describe('connections API', () => {
       { id: acme, name: 'Acme', slug: 'acme' },
       { id: globex, name: 'Globex', slug: 'globex' },
     ]);
+    await owner
+      .insert(workspaces)
+      .values({ id: production, organizationId: acme, name: 'Production', slug: 'production' });
     await owner
       .insert(users)
       .values([developer, operator, outsider].map((u) => ({ id: u.id, authSubject: u.sub })));
@@ -243,5 +247,102 @@ describe('connections API', () => {
     expect(read.status).toBe(200);
     expect(write.status).toBe(403);
     expect(foreign.status).toBe(404);
+  });
+
+  describe('used by HTTP steps', () => {
+    const definitionUsing = (connectionId: string, url: string) => ({
+      schemaVersion: 1,
+      trigger: { type: 'manual' },
+      steps: [
+        {
+          id: 'call',
+          name: 'Call CRM',
+          type: 'http_request',
+          config: { method: 'GET', url, connectionId },
+        },
+      ],
+    });
+
+    const crm = async (): Promise<string> => {
+      const res = await create({
+        name: `crm-${randomUUID().slice(0, 8)}`,
+        baseUrl: 'https://api.crm.example.test/v2',
+        auth: { type: 'bearer', token: 't' },
+      });
+      return (res.body as ConnectionBody).id;
+    };
+
+    const publish = async (definition: object) =>
+      request(httpServer(app))
+        .post(`/api/v1/organizations/${acme}/workspaces/${production}/workflows`)
+        .set('Authorization', await as(developer.sub))
+        .send({ name: 'Sync', key: `sync-${randomUUID().slice(0, 8)}`, definition });
+
+    it('accepts a step inside the base URL of a connection of the organization', async () => {
+      const res = await publish(
+        definitionUsing(await crm(), 'https://api.crm.example.test/v2/leads'),
+      );
+
+      expect(res.status).toBe(201);
+    });
+
+    it('rejects an unknown connection or a URL outside its base URL', async () => {
+      const unknown = await publish(
+        definitionUsing(randomUUID(), 'https://api.crm.example.test/v2/leads'),
+      );
+      const outside = await publish(definitionUsing(await crm(), 'https://evil.example.test/v2'));
+
+      for (const res of [unknown, outside]) {
+        expect(res.status).toBe(400);
+        expect(res.body).toMatchObject({
+          code: 'VALIDATION_FAILED',
+          details: { fields: ['definition.steps.0.config.connectionId'] },
+        });
+      }
+    });
+
+    it("rejects another organization's connection", async () => {
+      const foreign = await request(httpServer(app))
+        .post(connectionsOf(globex))
+        .set('Authorization', await as(outsider.sub))
+        .send({
+          name: 'foreign',
+          baseUrl: 'https://api.crm.example.test/v2',
+          auth: { type: 'bearer', token: 't' },
+        });
+
+      const res = await publish(
+        definitionUsing((foreign.body as ConnectionBody).id, 'https://api.crm.example.test/v2/x'),
+      );
+
+      expect(res.status).toBe(400);
+    });
+
+    it('refuses to delete a connection an active version uses', async () => {
+      const connectionId = await crm();
+      const created = await publish(
+        definitionUsing(connectionId, 'https://api.crm.example.test/v2/leads'),
+      );
+      const workflowId = (created.body as { id: string }).id;
+      const auth = await as(developer.sub);
+      await request(httpServer(app))
+        .put(`/api/v1/organizations/${acme}/workflows/${workflowId}/activation`)
+        .set('Authorization', auth)
+        .send({ version: 1 });
+
+      const inUse = await request(httpServer(app))
+        .delete(`${connectionsOf(acme)}/${connectionId}`)
+        .set('Authorization', auth);
+      await request(httpServer(app))
+        .delete(`/api/v1/organizations/${acme}/workflows/${workflowId}/activation`)
+        .set('Authorization', auth);
+      const unused = await request(httpServer(app))
+        .delete(`${connectionsOf(acme)}/${connectionId}`)
+        .set('Authorization', auth);
+
+      expect(inUse.status).toBe(409);
+      expect(inUse.body).toMatchObject({ code: 'CONNECTION_IN_USE' });
+      expect(unused.status).toBe(204);
+    });
   });
 });
