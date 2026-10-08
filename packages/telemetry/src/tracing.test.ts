@@ -2,7 +2,7 @@ import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterEach, describe, expect, it } from 'vitest';
 import { JsonLogger } from './json-logger';
-import { startTracing, type TracingHandle, tracingConfigFromEnv } from './tracing';
+import { isHealthProbe, startTracing, type TracingHandle, tracingConfigFromEnv } from './tracing';
 
 describe('tracingConfigFromEnv', () => {
   it('is disabled without an OTLP endpoint', () => {
@@ -58,7 +58,12 @@ describe('startTracing', () => {
 
   function start(exporter: InMemorySpanExporter): TracingHandle {
     handle = startTracing(
-      { serviceName: 'platform-api', environment: 'test', endpoint: 'http://unused:4318', sampleRatio: 1 },
+      {
+        serviceName: 'platform-api',
+        environment: 'test',
+        endpoint: 'http://unused:4318',
+        sampleRatio: 1,
+      },
       { spanExporter: exporter, instrument: false },
     );
     return handle;
@@ -101,5 +106,14 @@ describe('startTracing', () => {
     span.end();
     await handle?.forceFlush();
     expect(exporter.getFinishedSpans()[0]?.status.code).toBe(SpanStatusCode.ERROR);
+  });
+});
+
+describe('isHealthProbe', () => {
+  it('skips liveness and readiness probes only', () => {
+    expect(isHealthProbe({ url: '/health/live' })).toBe(true);
+    expect(isHealthProbe({ url: '/health/ready' })).toBe(true);
+    expect(isHealthProbe({ url: '/api/v1/workflows' })).toBe(false);
+    expect(isHealthProbe({ url: undefined })).toBe(false);
   });
 });

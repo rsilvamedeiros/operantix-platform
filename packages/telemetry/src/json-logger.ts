@@ -1,3 +1,4 @@
+import { trace } from '@opentelemetry/api';
 import { currentCorrelationId } from './correlation';
 import { sanitize } from './redact';
 
@@ -54,6 +55,7 @@ export class JsonLogger {
   private emit(level: LogLevel, message: unknown, context?: string): void {
     if (SEVERITY[level] < this.threshold) return;
     const correlationId = currentCorrelationId();
+    const span = trace.getActiveSpan()?.spanContext();
     const record: Record<string, unknown> = {
       timestamp: this.now().toISOString(),
       level,
@@ -61,6 +63,7 @@ export class JsonLogger {
       environment: this.options.environment,
       ...(context === undefined ? {} : { context }),
       ...(correlationId === undefined ? {} : { correlationId }),
+      ...(span === undefined ? {} : { traceId: span.traceId, spanId: span.spanId }),
       ...describe(message),
     };
     this.write(JSON.stringify(record));
