@@ -32,13 +32,13 @@ describe('JsonLogger', () => {
     ]);
   });
 
-  it('maps Nest levels to log levels', () => {
+  it('maps Nest levels to log levels (verbose is folded into debug)', () => {
     const { logger, records } = capture({ level: 'debug' });
     logger.error('e');
     logger.warn('w');
     logger.debug('d');
     logger.verbose('v');
-    expect(records().map((r) => r.level)).toEqual(['error', 'warn', 'debug']);
+    expect(records().map((r) => r.level)).toEqual(['error', 'warn', 'debug', 'debug']);
   });
 
   it('drops records below the configured level', () => {
@@ -51,7 +51,9 @@ describe('JsonLogger', () => {
 
   it('adds the correlation id of the running scope', () => {
     const { logger, records } = capture();
-    runWithCorrelation({ correlationId: 'req-1' }, () => logger.log('inside'));
+    runWithCorrelation({ correlationId: 'req-1' }, () => {
+      logger.log('inside');
+    });
     logger.log('outside');
     expect(records()[0]).toMatchObject({ correlationId: 'req-1' });
     expect(records()[1]).not.toHaveProperty('correlationId');
