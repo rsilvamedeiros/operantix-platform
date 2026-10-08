@@ -3,8 +3,8 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from ai_service.config import Settings
-from ai_service.llm import LlmError, LlmRejected, LlmUnavailable
+from ai_service.config import load_settings
+from ai_service.llm import LlmError, LlmRejectedError, LlmUnavailableError
 from ai_service.main import create_app
 from tests.fakes import ScriptedProvider, answer
 
@@ -23,11 +23,8 @@ def request_body(**overrides: object) -> dict[str, object]:
 
 
 def client(provider: ScriptedProvider, *, token: str | None = TOKEN) -> TestClient:
-    settings = Settings.model_validate(
-        {"AI_SERVICE_ENV": "test", "AI_SERVICE_TOKEN": token}
-        if token
-        else {"AI_SERVICE_ENV": "test"}
-    )
+    env = {"AI_SERVICE_ENV": "test"} | ({"AI_SERVICE_TOKEN": token} if token else {})
+    settings = load_settings(env)
     return TestClient(create_app(settings, provider=provider))
 
 
@@ -72,7 +69,7 @@ def test_sends_the_versioned_prompt_with_the_text_as_delimited_data() -> None:
     assert TEXT not in call.system
     assert f"<text>\n{TEXT}\n</text>" in call.user
     assert "billing: Charges, invoices and refunds" in call.user
-    assert call.schema["properties"]["label"]["enum"] == ["billing", "sales"]  # type: ignore[index]
+    assert call.schema["properties"]["label"]["enum"] == ["billing", "sales"]
     assert call.schema["additionalProperties"] is False
     assert call.effort == "low"
 
@@ -101,8 +98,8 @@ def test_rejects_answers_outside_the_request(output: str) -> None:
 @pytest.mark.parametrize(
     ("failure", "status", "code"),
     [
-        (LlmUnavailable("down"), 503, "LLM_UNAVAILABLE"),
-        (LlmRejected("bad key"), 502, "LLM_REJECTED"),
+        (LlmUnavailableError("down"), 503, "LLM_UNAVAILABLE"),
+        (LlmRejectedError("bad key"), 502, "LLM_REJECTED"),
     ],
 )
 def test_maps_provider_failures(failure: LlmError, status: int, code: str) -> None:

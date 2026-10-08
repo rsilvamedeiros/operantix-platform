@@ -1,7 +1,7 @@
 import json
 import logging
 
-from ai_service.logging import JsonFormatter
+from ai_service.logging import JsonFormatter, configure_logging
 
 
 def render(record: logging.LogRecord) -> dict[str, object]:
@@ -41,3 +41,16 @@ def test_includes_the_exception_type_but_not_its_traceback_text() -> None:
 
     assert line["error"] == "ValueError"
     assert "Traceback" not in json.dumps(line)
+
+
+def test_configures_the_root_logger_with_one_json_handler() -> None:
+    root = logging.getLogger()
+    saved = (root.handlers[:], root.level)
+    try:
+        configure_logging("WARNING")
+
+        [handler] = root.handlers
+        assert isinstance(handler.formatter, JsonFormatter)
+        assert root.level == logging.WARNING
+    finally:
+        root.handlers, root.level = saved[0], saved[1]

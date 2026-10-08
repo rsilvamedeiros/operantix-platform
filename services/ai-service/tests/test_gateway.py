@@ -7,9 +7,9 @@ from pydantic import BaseModel
 
 from ai_service.llm import (
     LlmGateway,
-    LlmOutputInvalid,
-    LlmRefused,
-    LlmUnavailable,
+    LlmOutputInvalidError,
+    LlmRefusedError,
+    LlmUnavailableError,
     Prompt,
 )
 from tests.fakes import ScriptedProvider, answer
@@ -83,7 +83,7 @@ async def test_reports_the_model_that_answered_and_no_cost_after_a_fallback() ->
 
 @pytest.mark.parametrize("text", ["not json", '{"word": 7}', '{"other": "x"}', ""])
 async def test_rejects_output_outside_the_schema(text: str) -> None:
-    with pytest.raises(LlmOutputInvalid) as error:
+    with pytest.raises(LlmOutputInvalidError) as error:
         await generate(gateway(ScriptedProvider([answer(text)])))
 
     assert error.value.code == "LLM_OUTPUT_INVALID"
@@ -91,20 +91,20 @@ async def test_rejects_output_outside_the_schema(text: str) -> None:
 
 
 async def test_treats_truncated_output_as_invalid() -> None:
-    with pytest.raises(LlmOutputInvalid):
+    with pytest.raises(LlmOutputInvalidError):
         await generate(gateway(ScriptedProvider([answer('{"word": "h', stop="max_tokens")])))
 
 
 async def test_surfaces_a_refusal() -> None:
-    with pytest.raises(LlmRefused) as error:
+    with pytest.raises(LlmRefusedError) as error:
         await generate(gateway(ScriptedProvider([answer("", stop="refusal")])))
 
     assert error.value.code == "LLM_REFUSED"
 
 
 async def test_propagates_provider_failures() -> None:
-    with pytest.raises(LlmUnavailable) as error:
-        await generate(gateway(ScriptedProvider([LlmUnavailable("timed out")])))
+    with pytest.raises(LlmUnavailableError) as error:
+        await generate(gateway(ScriptedProvider([LlmUnavailableError("timed out")])))
 
     assert error.value.retryable is True
 
@@ -145,10 +145,11 @@ async def test_logs_one_record_per_call_without_prompt_or_output(
 async def test_logs_failures_with_their_error_code(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.INFO, logger="ai_service.llm")
 
-    with pytest.raises(LlmOutputInvalid):
+    with pytest.raises(LlmOutputInvalidError):
         await generate(gateway(ScriptedProvider([answer("not json")])))
-    with pytest.raises(LlmUnavailable):
-        await generate(gateway(ScriptedProvider([LlmUnavailable("down")]), ticking_clock(1.0, 2.0)))
+    down = ScriptedProvider([LlmUnavailableError("down")])
+    with pytest.raises(LlmUnavailableError):
+        await generate(gateway(down, ticking_clock(1.0, 2.0)))
 
     first, second = logged_fields(caplog)
     assert first["outcome"] == "LLM_OUTPUT_INVALID"

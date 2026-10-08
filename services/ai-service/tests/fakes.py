@@ -1,6 +1,7 @@
 """Test doubles for the LLM provider boundary."""
 
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from ai_service.llm import Completion, CompletionResult, LlmError, StopReason
 
@@ -10,7 +11,7 @@ class ScriptedProvider:
     """Answers each call with the next scripted result, or raises the scripted error."""
 
     script: list[CompletionResult | LlmError]
-    name: str = "scripted"
+    name: ClassVar[str] = "scripted"
     calls: list[Completion] = field(default_factory=list)
 
     async def complete(self, completion: Completion) -> CompletionResult:

@@ -8,8 +8,8 @@ from anthropic import AsyncAnthropic, DefaultAsyncHttpxClient
 from ai_service.llm import (
     AnthropicProvider,
     Completion,
-    LlmRejected,
-    LlmUnavailable,
+    LlmRejectedError,
+    LlmUnavailableError,
 )
 
 API_KEY = "test-" + "k" * 16
@@ -142,7 +142,7 @@ def api_error(status: int, kind: str) -> Handler:
     ],
 )
 async def test_treats_throttling_and_server_errors_as_unavailable(status: int, kind: str) -> None:
-    with pytest.raises(LlmUnavailable):
+    with pytest.raises(LlmUnavailableError):
         await provider(api_error(status, kind)).complete(COMPLETION)
 
 
@@ -156,7 +156,7 @@ async def test_treats_throttling_and_server_errors_as_unavailable(status: int, k
     ],
 )
 async def test_treats_client_errors_as_rejected(status: int, kind: str) -> None:
-    with pytest.raises(LlmRejected) as error:
+    with pytest.raises(LlmRejectedError) as error:
         await provider(api_error(status, kind)).complete(COMPLETION)
 
     assert error.value.retryable is False
@@ -169,12 +169,12 @@ async def test_treats_timeouts_and_network_errors_as_unavailable(
     def fail(request: httpx2.Request) -> httpx2.Response:
         raise failure("boom", request=request)
 
-    with pytest.raises(LlmUnavailable):
+    with pytest.raises(LlmUnavailableError):
         await provider(fail).complete(COMPLETION)
 
 
 async def test_never_puts_the_api_key_in_error_messages() -> None:
-    with pytest.raises(LlmRejected) as error:
+    with pytest.raises(LlmRejectedError) as error:
         await provider(api_error(401, "authentication_error")).complete(COMPLETION)
 
     assert API_KEY not in str(error.value)
