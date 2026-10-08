@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { KafkaEventPublisher } from '../src/messaging/kafka-publisher';
-import { startKafka, type TestKafka } from './support/kafka';
+import { KafkaEventPublisher } from '../src/kafka-publisher';
+import { startKafka, type TestKafka } from '@operantix/testing';
 
 describe('Kafka event publisher', () => {
   let kafka: TestKafka;

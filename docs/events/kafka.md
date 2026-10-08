@@ -27,6 +27,6 @@ consumer lag, processing latency, error rate, retry count, DLQ volume.
 
 - Broker local: `apache/kafka:4.1.0` em KRaft no `compose.yaml` (`localhost:9092`), sem criação automática de tópicos. O serviço `kafka-init` cria os tópicos de `infrastructure/docker/kafka/create-topics.sh`.
 - Tópico ativo: `opx.execution.events.v1` (6 partições), chaveado por `executionId`.
-- Cliente: `@confluentinc/kafka-javascript` (ADR-0020), producer idempotente com `acks=all`, atrás de `EventPublisher` no workflow worker.
+- Cliente: `@confluentinc/kafka-javascript` (ADR-0020) no pacote `@operantix/messaging`; producer idempotente com `acks=all`, atrás de `EventPublisher`.
 - Relay da outbox (ADR-0021) publica cada evento com chave = `executionId` e headers `event-id`, `event-type`, `event-version` e `traceparent`.
-- Ainda não implementado: consumers, retry topics e DLQ.
+- Consumer: `KafkaEventConsumer` em `@operantix/messaging`, com retry topic e DLQ por consumer group (`docs/events/retry-dlq.md`). Ainda sem consumer de produção; o primeiro é o integration worker (M05).
