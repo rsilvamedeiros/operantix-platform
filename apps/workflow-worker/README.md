@@ -31,6 +31,9 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 | `WORKER_STEP_MAX_ATTEMPTS` | `3` (máx. 10) |
 | `WORKER_RETRY_BASE_DELAY_MS` | `2000` |
 | `SECRETS_ENCRYPTION_KEYS` | obrigatória; o mesmo keyring do `platform-api`, para abrir credenciais de connections (ADR-0025) |
+| `AI_SERVICE_URL` | sem valor; sem ela, steps `ai_classify` falham com `AI_SERVICE_NOT_CONFIGURED` |
+| `AI_SERVICE_TOKEN` | obrigatória com `AI_SERVICE_URL`; o mesmo `AI_SERVICE_TOKEN` do `services/ai-service` (ADR-0028), mínimo de 32 caracteres |
+| `WORKER_AI_TIMEOUT_MS` | `45000`; precisa ser menor que o lease. Deixe acima de timeout × (retries + 1) do AI service, senão uma chamada lenta é cortada e tentada de novo |
 
 ## Como funciona
 
@@ -41,6 +44,8 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 Cada mudança de estado grava um evento em `execution_events` na mesma transação; a API expõe isso como timeline (`GET .../executions/{id}/timeline`, ver o README do `platform-api`).
 
 Na mesma transação, as mudanças do ciclo de vida também viram eventos de contrato (`@operantix/contracts`) em `outbox_events`: `execution.started`, `execution.step.started`, `execution.step.completed`, `execution.step.failed` (com `errorCode` e `retryable`, sem mensagem), `execution.completed` e `execution.failed`. Esperas e retomadas de `delay` ficam só na timeline. Cada linha guarda o envelope completo, o topic (`opx.execution.events.v1`) e a partition key (`executionId`). Até o OpenTelemetry (M07), o `traceId` é o `executionId` sem hífens, então todos os eventos de uma execução compartilham o trace. A publicação no Kafka é do relay da outbox (abaixo).
+
+Step `ai_classify` (`src/steps/ai-classify-step.ts`): lê o campo `inputField` do input da execução (caminho com pontos, só propriedades próprias) e chama `POST /v1/classifications` do AI service com os `labels` do step e a organização. A saída do step é `{label, confidence, promptVersion, model, usage}`. Campo ausente, vazio, que não é texto ou com mais de 20.000 caracteres falha permanente com `STEP_INPUT_INVALID`, sem copiar o texto no erro. Do AI service, só `LLM_UNAVAILABLE` (503), timeout e falha de conexão são retentáveis; `LLM_REFUSED`, `LLM_OUTPUT_INVALID`, `LLM_REJECTED` e token recusado (`AI_SERVICE_UNAUTHORIZED`) falham o step. O teste `ai-service-contract.test.ts` confere o cliente contra o `services/ai-service/openapi.json`.
 
 Regras:
 

@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classificationSchema, classifyTextRequestSchema } from './ai-service-client';
 
 // The AI service commits its OpenAPI document (ADR-0028); this keeps the client in step with it.
 const document = JSON.parse(
-  readFileSync(new URL('../../../../services/ai-service/openapi.json', import.meta.url), 'utf8'),
+  readFileSync(resolve(__dirname, '../../../../services/ai-service/openapi.json'), 'utf8'),
 ) as {
   paths: Record<string, Record<string, unknown>>;
   components: { schemas: Record<string, { properties: object; required?: string[] }> };

@@ -30,6 +30,22 @@ const stepBase = {
   name: z.string().trim().min(1).max(100),
 };
 
+// The AI service's limits for classification (services/ai-service, ADR-0028), checked on publish
+// so a definition cannot fail on every run.
+const aiLabel = z.strictObject({
+  name: z.string().regex(/^[A-Za-z0-9_.:-]{1,64}$/, 'Expected 1-64 letters, digits or _.:-'),
+  description: z.string().max(500).optional(),
+});
+const aiLabels = z
+  .array(aiLabel)
+  .min(2)
+  .max(50)
+  .refine((labels) => new Set(labels.map((l) => l.name)).size === labels.length, {
+    message: 'Label names must be unique',
+  });
+// A dot path into the execution input, up to 10 levels: `ticket.body`.
+const INPUT_FIELD = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*){0,9}$/;
+
 const step = z.discriminatedUnion('type', [
   z.strictObject({
     ...stepBase,
@@ -48,6 +64,14 @@ const step = z.discriminatedUnion('type', [
     ...stepBase,
     type: z.literal('delay'),
     config: z.strictObject({ seconds: z.int().min(1).max(86_400) }),
+  }),
+  z.strictObject({
+    ...stepBase,
+    type: z.literal('ai_classify'),
+    config: z.strictObject({
+      inputField: z.string().regex(INPUT_FIELD, 'Expected a dot path into the execution input'),
+      labels: aiLabels,
+    }),
   }),
   z.strictObject({
     ...stepBase,

@@ -25,6 +25,11 @@ const EnvSchema = z
     WORKER_RETRY_BASE_DELAY_MS: positive.default(2_000),
     // Opens connection credentials for HTTP steps (ADR-0025); same keyring as platform-api.
     SECRETS_ENCRYPTION_KEYS: z.string().min(1),
+    // The AI service for ai_classify steps (ADR-0028); without it those steps fail permanently.
+    AI_SERVICE_URL: z.url({ protocol: /^https?$/ }).optional(),
+    AI_SERVICE_TOKEN: z.string().min(32).optional(),
+    // Keep it above the AI service's timeout x (retries + 1), or a slow call is cut and retried.
+    WORKER_AI_TIMEOUT_MS: positive.default(45_000),
   })
   .refine(
     (e) => !(e.NODE_ENV === 'production' && e.WORKER_HTTP_ALLOW_PRIVATE_NETWORKS === 'true'),
@@ -37,6 +42,14 @@ const EnvSchema = z
   .refine((e) => e.WORKER_HTTP_TIMEOUT_MS < e.WORKER_LEASE_SECONDS * 1000, {
     path: ['WORKER_HTTP_TIMEOUT_MS'],
     message: 'Must be shorter than WORKER_LEASE_SECONDS',
+  })
+  .refine((e) => e.WORKER_AI_TIMEOUT_MS < e.WORKER_LEASE_SECONDS * 1000, {
+    path: ['WORKER_AI_TIMEOUT_MS'],
+    message: 'Must be shorter than WORKER_LEASE_SECONDS',
+  })
+  .refine((e) => e.AI_SERVICE_URL === undefined || e.AI_SERVICE_TOKEN !== undefined, {
+    path: ['AI_SERVICE_TOKEN'],
+    message: 'Required with AI_SERVICE_URL',
   });
 
 export interface WorkerConfig {
@@ -48,6 +61,8 @@ export interface WorkerConfig {
   http: { timeoutMs: number; allowPrivateNetworks: boolean; maxResponseBytes: number };
   retry: { maxStepAttempts: number; baseDelayMs: number };
   secrets: { keyring: Keyring };
+  /** Unset when AI_SERVICE_URL is: ai_classify steps then fail as not configured. */
+  ai?: { url: string; token: string; timeoutMs: number };
 }
 
 export class ConfigValidationError extends Error {
@@ -98,5 +113,14 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
       baseDelayMs: e.WORKER_RETRY_BASE_DELAY_MS,
     },
     secrets: { keyring },
+    ...(e.AI_SERVICE_URL !== undefined && e.AI_SERVICE_TOKEN !== undefined
+      ? {
+          ai: {
+            url: e.AI_SERVICE_URL,
+            token: e.AI_SERVICE_TOKEN,
+            timeoutMs: e.WORKER_AI_TIMEOUT_MS,
+          },
+        }
+      : {}),
   };
 }

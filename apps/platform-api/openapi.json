@@ -1468,6 +1468,67 @@
                                 },
                                 "type": {
                                   "type": "string",
+                                  "const": "ai_classify"
+                                },
+                                "config": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputField": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*){0,9}$"
+                                    },
+                                    "labels": {
+                                      "minItems": 2,
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "maxLength": 500
+                                          }
+                                        },
+                                        "required": [
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "inputField",
+                                    "labels"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "type",
+                                "config"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]{0,62}$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "type": {
+                                  "type": "string",
                                   "const": "log"
                                 },
                                 "config": {
@@ -1925,6 +1986,67 @@
                                   },
                                   "type": {
                                     "type": "string",
+                                    "const": "ai_classify"
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "properties": {
+                                      "inputField": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*){0,9}$"
+                                      },
+                                      "labels": {
+                                        "minItems": 2,
+                                        "maxItems": 50,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "maxLength": 500
+                                            }
+                                          },
+                                          "required": [
+                                            "name"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "inputField",
+                                      "labels"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "config"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9_]{0,62}$"
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  },
+                                  "type": {
+                                    "type": "string",
                                     "const": "log"
                                   },
                                   "config": {
@@ -2287,6 +2409,67 @@
                                 },
                                 "type": {
                                   "type": "string",
+                                  "const": "ai_classify"
+                                },
+                                "config": {
+                                  "type": "object",
+                                  "properties": {
+                                    "inputField": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*){0,9}$"
+                                    },
+                                    "labels": {
+                                      "minItems": 2,
+                                      "maxItems": 50,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string",
+                                            "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+                                          },
+                                          "description": {
+                                            "type": "string",
+                                            "maxLength": 500
+                                          }
+                                        },
+                                        "required": [
+                                          "name"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "inputField",
+                                    "labels"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name",
+                                "type",
+                                "config"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_]{0,62}$"
+                                },
+                                "name": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 100
+                                },
+                                "type": {
+                                  "type": "string",
                                   "const": "log"
                                 },
                                 "config": {
@@ -2505,6 +2688,67 @@
                                     },
                                     "required": [
                                       "seconds"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "id",
+                                  "name",
+                                  "type",
+                                  "config"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9_]{0,62}$"
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 100
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "const": "ai_classify"
+                                  },
+                                  "config": {
+                                    "type": "object",
+                                    "properties": {
+                                      "inputField": {
+                                        "type": "string",
+                                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*){0,9}$"
+                                      },
+                                      "labels": {
+                                        "minItems": 2,
+                                        "maxItems": 50,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string",
+                                              "pattern": "^[A-Za-z0-9_.:-]{1,64}$"
+                                            },
+                                            "description": {
+                                              "type": "string",
+                                              "maxLength": 500
+                                            }
+                                          },
+                                          "required": [
+                                            "name"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "inputField",
+                                      "labels"
                                     ],
                                     "additionalProperties": false
                                   }
