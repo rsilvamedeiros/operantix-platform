@@ -2,7 +2,13 @@ import { SpanStatusCode, trace } from '@opentelemetry/api';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterEach, describe, expect, it } from 'vitest';
 import { JsonLogger } from './json-logger';
-import { isHealthProbe, startTracing, type TracingHandle, tracingConfigFromEnv } from './tracing';
+import {
+  isHealthProbe,
+  startTracing,
+  startTracingFromEnv,
+  type TracingHandle,
+  tracingConfigFromEnv,
+} from './tracing';
 
 describe('tracingConfigFromEnv', () => {
   it('is disabled without an OTLP endpoint', () => {
@@ -115,5 +121,24 @@ describe('isHealthProbe', () => {
     expect(isHealthProbe({ url: '/health/ready' })).toBe(true);
     expect(isHealthProbe({ url: '/api/v1/workflows' })).toBe(false);
     expect(isHealthProbe({ url: undefined })).toBe(false);
+  });
+});
+
+describe('startTracingFromEnv', () => {
+  it('starts nothing, and registers no signal handlers, when tracing is not configured', () => {
+    const before = process.listenerCount('SIGTERM');
+    expect(startTracingFromEnv({}, 'platform-api')).toBeUndefined();
+    expect(process.listenerCount('SIGTERM')).toBe(before);
+  });
+
+  it('starts tracing when an endpoint is configured and flushes on SIGTERM', async () => {
+    const handle = startTracingFromEnv(
+      { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:1' },
+      'platform-api',
+      { instrument: false },
+    );
+    expect(handle).toBeDefined();
+    expect(process.listenerCount('SIGTERM')).toBeGreaterThan(0);
+    await handle?.shutdown();
   });
 });
