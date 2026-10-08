@@ -21,6 +21,7 @@
     "@operantix/contracts": "workspace:*",
     "@operantix/http-client": "workspace:*",
     "@operantix/secrets": "workspace:*",
+    "@operantix/telemetry": "workspace:*",
     "drizzle-orm": "^0.45.3",
     "jose": "^6.2.12",
     "pg": "^8.23.1",
