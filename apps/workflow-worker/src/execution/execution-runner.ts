@@ -1,10 +1,19 @@
+import { randomUUID } from 'node:crypto';
 import { Logger } from '@nestjs/common';
+import {
+  createEvent,
+  type EventData,
+  type EventType,
+  partitionKey,
+  topicFor,
+} from '@operantix/contracts';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { type Database, type Transaction, withTenant } from '../database';
 import {
   executionEvents,
   executionJobs,
   executions,
+  outboxEvents,
   stepExecutions,
   type WorkflowStep,
   workflowVersions,
@@ -23,6 +32,14 @@ export interface RetryPolicy {
 }
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
+
+/** Stored on a failed execution; `code` is the machine-readable part events carry. */
+// A type alias, not an interface, so it fits the jsonb column's Record type.
+type ExecutionError = {
+  code: string;
+  message: string;
+  stepId?: string;
+};
 
 interface StepFailure {
   code: string;
@@ -70,7 +87,7 @@ export class ExecutionRunner {
     if (job.attempts > job.maxAttempts) {
       this.logger.warn({ ...scope, attempts: job.attempts, msg: 'Execution ran out of attempts' });
       await tenant((tx) =>
-        finish(tx, job, 'FAILED', {
+        finish(tx, job, execution.workflowId, 'FAILED', {
           code: 'MAX_ATTEMPTS_EXCEEDED',
           message: `Execution was claimed ${String(job.attempts)} times without finishing`,
         }),
@@ -84,7 +101,14 @@ export class ExecutionRunner {
         .set({ status: 'RUNNING', startedAt: sql`now()` })
         .where(and(eq(executions.id, job.executionId), eq(executions.status, 'PENDING')))
         .returning({ id: executions.id });
-      if (started.length > 0) await record(tx, job, 'execution.started');
+      if (started.length > 0) {
+        await record(tx, job, 'execution.started');
+        await publish(tx, job, 'execution.started', {
+          executionId: job.executionId,
+          workflowId: execution.workflowId,
+          workflowVersion: execution.workflowVersion,
+        });
+      }
       const [version] = await tx
         .select({ definition: workflowVersions.definition })
         .from(workflowVersions)
@@ -136,10 +160,16 @@ export class ExecutionRunner {
           .where(eq(stepExecutions.id, step.id))
           .returning({ attempts: stepExecutions.attempts, startedAt: stepExecutions.startedAt });
         const attempt = started?.attempts ?? 1;
-        await record(tx, job, step.status === 'WAITING' ? 'step.resumed' : 'step.started', {
-          stepId: step.stepId,
-          attempt,
-        });
+        if (step.status === 'WAITING') {
+          await record(tx, job, 'step.resumed', { stepId: step.stepId, attempt });
+        } else {
+          await record(tx, job, 'step.started', { stepId: step.stepId, attempt });
+          await publish(tx, job, 'execution.step.started', {
+            executionId: job.executionId,
+            stepId: step.stepId,
+            attempt,
+          });
+        }
         return {
           status: row.status,
           attempt,
@@ -197,6 +227,7 @@ export class ExecutionRunner {
           const runAfter = new Date(Date.now() + delayMs);
           const at = { stepId: step.stepId, attempt: current.attempt };
           await record(tx, job, 'step.failed', { ...at, details: failureDetails(result.failure) });
+          await publishStepFailure(tx, job, at, result.failure);
           await record(tx, job, 'step.retry_scheduled', {
             ...at,
             details: { runAfter: runAfter.toISOString() },
@@ -218,12 +249,10 @@ export class ExecutionRunner {
             .update(stepExecutions)
             .set({ status: 'FAILED', error: { ...result.failure }, finishedAt: sql`now()` })
             .where(eq(stepExecutions.id, step.id));
-          await record(tx, job, 'step.failed', {
-            stepId: step.stepId,
-            attempt: current.attempt,
-            details: failureDetails(result.failure),
-          });
-          await finish(tx, job, 'FAILED', {
+          const at = { stepId: step.stepId, attempt: current.attempt };
+          await record(tx, job, 'step.failed', { ...at, details: failureDetails(result.failure) });
+          await publishStepFailure(tx, job, at, result.failure);
+          await finish(tx, job, execution.workflowId, 'FAILED', {
             code: 'STEP_FAILED',
             stepId: step.stepId,
             message: `Step "${step.stepId}" failed`,
@@ -237,11 +266,13 @@ export class ExecutionRunner {
           .update(stepExecutions)
           .set({ status: 'SUCCEEDED', output: result.output, error: null, finishedAt: sql`now()` })
           .where(eq(stepExecutions.id, step.id));
-        await record(tx, job, 'step.succeeded', { stepId: step.stepId, attempt: current.attempt });
+        const at = { stepId: step.stepId, attempt: current.attempt };
+        await record(tx, job, 'step.succeeded', at);
+        await publish(tx, job, 'execution.step.completed', { executionId: job.executionId, ...at });
       });
     }
 
-    await tenant((tx) => finish(tx, job, 'SUCCEEDED', null));
+    await tenant((tx) => finish(tx, job, execution.workflowId, 'SUCCEEDED', null));
     this.logger.log({ ...scope, msg: 'Execution succeeded' });
     return 'SUCCEEDED';
   }
@@ -299,8 +330,9 @@ export class ExecutionRunner {
 async function finish(
   tx: Transaction,
   job: ClaimedJob,
+  workflowId: string,
   status: 'SUCCEEDED' | 'FAILED',
-  error: Record<string, unknown> | null,
+  error: ExecutionError | null,
 ): Promise<void> {
   const finished = await tx
     .update(executions)
@@ -318,10 +350,15 @@ async function finish(
         inArray(stepExecutions.status, ['PENDING', 'RUNNING', 'WAITING']),
       ),
     );
-  if (finished.length > 0) {
-    const code = error?.['code'];
-    await record(tx, job, status === 'SUCCEEDED' ? 'execution.succeeded' : 'execution.failed', {
-      details: typeof code === 'string' ? { code } : null,
+  if (finished.length === 0) return;
+  if (error === null) {
+    await record(tx, job, 'execution.succeeded');
+    await publish(tx, job, 'execution.completed', { executionId: job.executionId, workflowId });
+  } else {
+    await record(tx, job, 'execution.failed', { details: { code: error.code } });
+    await publish(tx, job, 'execution.failed', {
+      executionId: job.executionId,
+      errorCode: error.code,
     });
   }
 }
@@ -344,6 +381,49 @@ async function record(
     stepId: fields.stepId ?? null,
     attempt: fields.attempt ?? null,
     details: fields.details ?? null,
+  });
+}
+
+/**
+ * Writes a lifecycle event to the outbox, in the transaction of the change it describes, so
+ * the event exists exactly when the change committed (ADR-0011). The relay publishes it.
+ */
+async function publish<T extends EventType>(
+  tx: Transaction,
+  job: ClaimedJob,
+  eventType: T,
+  data: EventData<T>,
+): Promise<void> {
+  const event = createEvent(eventType, data, {
+    eventId: randomUUID(),
+    occurredAt: new Date(),
+    producer: 'workflow-worker',
+    // One trace per execution, derived from its id, until OpenTelemetry (M07) supplies the
+    // active span's trace id. A UUID without dashes is 32 hex characters.
+    traceId: job.executionId.replaceAll('-', ''),
+    tenant: { organizationId: job.organizationId },
+  });
+  await tx.insert(outboxEvents).values({
+    organizationId: job.organizationId,
+    eventId: event.eventId,
+    topic: topicFor(event.eventType),
+    partitionKey: partitionKey(event),
+    eventType: event.eventType,
+    payload: event,
+  });
+}
+
+async function publishStepFailure(
+  tx: Transaction,
+  job: ClaimedJob,
+  at: { stepId: string; attempt: number },
+  failure: StepFailure,
+): Promise<void> {
+  await publish(tx, job, 'execution.step.failed', {
+    executionId: job.executionId,
+    ...at,
+    errorCode: failure.code,
+    retryable: failure.retryable,
   });
 }
 

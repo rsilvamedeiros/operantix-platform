@@ -1,3 +1,4 @@
+import { parseEvent } from '@operantix/contracts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database';
 import type { WorkflowStep } from '../src/engine.schema';
@@ -101,6 +102,20 @@ describe('workflow worker against PostgreSQL', () => {
         [id],
       )
     ).rows.map((e) => [e.type, e.step_id, e.attempt]);
+  const outbox = async (id: string) =>
+    (
+      await database.owner.query<{
+        event_id: string;
+        organization_id: string;
+        topic: string;
+        event_type: string;
+        payload: unknown;
+      }>(
+        `SELECT event_id, organization_id, topic, event_type, payload FROM outbox_events
+         WHERE partition_key = $1 ORDER BY id`,
+        [id],
+      )
+    ).rows;
   const jobCount = async (id: string) =>
     (await database.owner.query('SELECT 1 FROM execution_jobs WHERE execution_id = $1', [id]))
       .rowCount;
@@ -148,6 +163,60 @@ describe('workflow worker against PostgreSQL', () => {
       ['step.succeeded', 'second', 1],
       ['execution.succeeded', null, null],
     ]);
+  });
+
+  it('publishes the lifecycle of a run through the outbox', async () => {
+    const seeded = await database.seedExecution([log('first'), log('second')]);
+
+    await loop.tick();
+
+    const rows = await outbox(seeded.executionId);
+    const events = rows.map((row) => parseEvent(row.payload));
+    expect(events.map((e) => [e.eventType, 'stepId' in e.data ? e.data.stepId : null])).toEqual([
+      ['execution.started', null],
+      ['execution.step.started', 'first'],
+      ['execution.step.completed', 'first'],
+      ['execution.step.started', 'second'],
+      ['execution.step.completed', 'second'],
+      ['execution.completed', null],
+    ]);
+    expect(events[0]?.data).toEqual({
+      executionId: seeded.executionId,
+      workflowId: expect.any(String) as unknown,
+      workflowVersion: 1,
+    });
+    for (const [i, row] of rows.entries()) {
+      expect(row).toMatchObject({
+        topic: 'opx.execution.events.v1',
+        organization_id: seeded.organizationId,
+        event_type: events[i]?.eventType,
+        event_id: events[i]?.eventId,
+      });
+    }
+    expect(new Set(events.map((e) => e.eventId)).size).toBe(events.length);
+    expect(events.every((e) => e.producer === 'workflow-worker')).toBe(true);
+    expect(events.every((e) => e.tenant.organizationId === seeded.organizationId)).toBe(true);
+    // One trace per execution until OpenTelemetry (M07) supplies the active span.
+    expect(new Set(events.map((e) => e.traceId)).size).toBe(1);
+  });
+
+  it('publishes failures with their code but not their message', async () => {
+    const seeded = await database.seedExecution([
+      { id: 'call', name: 'Call', type: 'refuse', config: {} },
+      log('never'),
+    ]);
+
+    await loop.tick();
+
+    const rows = await outbox(seeded.executionId);
+    expect(rows.map((row) => parseEvent(row.payload)).slice(2)).toMatchObject([
+      {
+        eventType: 'execution.step.failed',
+        data: { stepId: 'call', attempt: 1, errorCode: 'HTTP_STATUS', retryable: false },
+      },
+      { eventType: 'execution.failed', data: { errorCode: 'STEP_FAILED' } },
+    ]);
+    expect(JSON.stringify(rows)).not.toContain('Destination responded 400');
   });
 
   it('records failures and skipped steps in the timeline', async () => {
@@ -297,6 +366,20 @@ describe('workflow worker against PostgreSQL', () => {
         ['step.started', 'call', 2],
         ['step.succeeded', 'call', 2],
         ['execution.succeeded', null, null],
+      ]);
+      expect(
+        (await outbox(seeded.executionId))
+          .map((row) => parseEvent(row.payload))
+          .filter((e) => e.eventType === 'execution.step.failed')
+          .map((e) => e.data),
+      ).toEqual([
+        {
+          executionId: seeded.executionId,
+          stepId: 'call',
+          attempt: 1,
+          errorCode: 'UPSTREAM_UNAVAILABLE',
+          retryable: true,
+        },
       ]);
     });
 

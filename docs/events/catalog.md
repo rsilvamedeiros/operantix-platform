@@ -13,7 +13,7 @@ Definidos em `packages/contracts/src/events/execution-events.ts`, com JSON Schem
 | `execution.completed` | 1 | `executionId`, `workflowId` | notificação de término (integrações, M05) |
 | `execution.failed` | 1 | `executionId`, `errorCode` | notificação de falha (integrações, M05) |
 
-Mensagens de erro ficam fora dos eventos: podem citar destinos HTTP. O producer (workflow worker, via outbox) e o topic entram nas próximas entregas do M04.
+Mensagens de erro ficam fora dos eventos: podem citar destinos HTTP. Producer: o workflow worker, via outbox (`docs/events/outbox.md`), no topic `opx.execution.events.v1`. A publicação no Kafka entra na próxima entrega do M04.
 
 ## Candidates
 

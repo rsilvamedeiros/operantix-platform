@@ -13,5 +13,6 @@ export {
   type EventType,
   parseEvent,
   partitionKey,
+  topicFor,
 } from './events/events';
 export { eventJsonSchemas } from './json-schemas';

@@ -6,6 +6,7 @@ import {
   type EventMetadata,
   parseEvent,
   partitionKey,
+  topicFor,
 } from '../index';
 
 const ORG = '0b9f6c1e-3d4a-4f7b-9a51-2c8e7d6f5a43';
@@ -170,6 +171,11 @@ describe('execution events', () => {
     ];
 
     expect(events.map(partitionKey)).toEqual(Array(events.length).fill(EXECUTION));
+  });
+
+  it('are published on the execution events topic', () => {
+    expect(topicFor('execution.started')).toBe('opx.execution.events.v1');
+    expect(topicFor('execution.step.failed')).toBe('opx.execution.events.v1');
   });
 
   it('reject an attempt below 1', () => {

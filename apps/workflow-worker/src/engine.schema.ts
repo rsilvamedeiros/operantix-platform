@@ -68,6 +68,16 @@ export const executionEvents = pgTable('execution_events', {
   details: jsonb('details').$type<Record<string, unknown>>(),
 });
 
+/** Transactional outbox (ADR-0011): insert only, in the transaction of the state change. */
+export const outboxEvents = pgTable('outbox_events', {
+  organizationId: uuid('organization_id').notNull(),
+  eventId: uuid('event_id').notNull(),
+  topic: text('topic').notNull(),
+  partitionKey: text('partition_key').notNull(),
+  eventType: text('event_type').notNull(),
+  payload: jsonb('payload').notNull(),
+});
+
 export const workflowVersions = pgTable('workflow_versions', {
   organizationId: uuid('organization_id').notNull(),
   workflowId: uuid('workflow_id').notNull(),

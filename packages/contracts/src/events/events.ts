@@ -75,7 +75,24 @@ export function parseEvent(raw: unknown): AnyEvent {
   return { ...envelope.data, data: data.data } as AnyEvent;
 }
 
+const EXECUTION_EVENTS_TOPIC = 'opx.execution.events.v1';
+
+/** One topic per domain, not per tenant (docs/events/kafka.md); a new event type must pick one. */
+const TOPICS: Record<EventType, string> = {
+  'execution.started': EXECUTION_EVENTS_TOPIC,
+  'execution.step.started': EXECUTION_EVENTS_TOPIC,
+  'execution.step.completed': EXECUTION_EVENTS_TOPIC,
+  'execution.step.failed': EXECUTION_EVENTS_TOPIC,
+  'execution.completed': EXECUTION_EVENTS_TOPIC,
+  'execution.failed': EXECUTION_EVENTS_TOPIC,
+};
+
+/** The Kafka topic an event is published on. */
+export function topicFor(eventType: EventType): string {
+  return TOPICS[eventType];
+}
+
 /** Kafka partition key: one execution's events share a partition and so keep their order. */
-export function partitionKey(event: AnyEvent): string {
+export function partitionKey(event: { data: { executionId: string } }): string {
   return event.data.executionId;
 }
