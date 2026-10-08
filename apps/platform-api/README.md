@@ -123,6 +123,10 @@ Uma organização registra para onde seus eventos de execução vão (`POST /api
 
 O secret fica em `secrets`, cifrado com AES-256-GCM pelo keyring de `SECRETS_ENCRYPTION_KEYS` e preso ao tenant e à linha (ADR-0022). A API só cifra. Viewers não veem endpoints, porque URLs podem carregar tokens; operators leem, mas não alteram. A entrega dos eventos é do integration worker.
 
+## Connections
+
+`/api/v1/organizations/{organizationId}/connections` guarda credenciais para passos HTTP (ADR-0025): `name` (identificador único na organização), `baseUrl` (`http`/`https`, sem credenciais, query ou fragmento) e `auth`, que é `{"type":"bearer","token":"..."}` ou `{"type":"header","headerName":"X-Api-Key","value":"..."}`. A credencial vai para `secrets` (`CONNECTION_CREDENTIAL`) e nunca volta pela API; `PUT .../{connectionId}/credential` troca a credencial, e `DELETE` apaga a connection e o secret. Ler exige `integration:read`; o resto, `integration:write`. Tudo é auditado, sem o valor.
+
 ## Inbound webhooks
 
 `/api/v1/organizations/{organizationId}/inbound-webhooks` cria, lista, lê, rotaciona e apaga URLs assinadas que iniciam um workflow (`integration:read` para ler, `integration:write` para o resto). A rota pública `POST /hooks/v1/{organizationId}/{inboundWebhookId}` não usa token: verifica `Operantix-Signature` sobre o corpo cru (o app mantém `rawBody`), exige `Idempotency-Key` e inicia a execução com `triggerType: "webhook"` (ADR-0024, `docs/api/webhooks.md`). É o único lugar em que a API abre um secret, e só do tipo `WEBHOOK_INBOUND`.
