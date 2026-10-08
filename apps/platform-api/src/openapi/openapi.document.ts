@@ -8,6 +8,7 @@ import {
   createWorkflowVersionSchema,
 } from '../workflows/workflow.dto';
 import { startExecutionSchema } from '../executions/execution.dto';
+import { createInboundWebhookSchema } from '../integrations/inbound-webhook.dto';
 import {
   createWebhookEndpointSchema,
   setWebhookEndpointStatusSchema,
@@ -28,6 +29,7 @@ interface Parameter {
   in: 'query' | 'header';
   description: string;
   schema: Record<string, unknown>;
+  required?: boolean;
 }
 
 interface Operation {
@@ -359,6 +361,89 @@ const OPERATIONS: Operation[] = [
     access: 'integration:write',
     responses: { '204': noContent('Deleted') },
   },
+  {
+    method: 'post',
+    path: `${ORG}/inbound-webhooks`,
+    summary: 'Create a signed URL that starts a workflow; returns its signing secret once',
+    tag: 'webhooks',
+    access: 'integration:write',
+    request: createInboundWebhookSchema,
+    responses: {
+      '201': ok('Created, with the signing secret', responses.inboundWebhookWithSecretResponse),
+      '400': invalidBody,
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/inbound-webhooks`,
+    summary: 'Inbound webhooks of the organization, oldest first',
+    tag: 'webhooks',
+    access: 'integration:read',
+    responses: { '200': ok('Inbound webhooks', responses.inboundWebhooksResponse) },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/inbound-webhooks/{inboundWebhookId}`,
+    summary: 'An inbound webhook (never its secret)',
+    tag: 'webhooks',
+    access: 'integration:read',
+    responses: { '200': ok('Inbound webhook', responses.inboundWebhookResponse) },
+  },
+  {
+    method: 'post',
+    path: `${ORG}/inbound-webhooks/{inboundWebhookId}/rotate-secret`,
+    summary: 'Replace the signing secret at once; returns the new one',
+    tag: 'webhooks',
+    access: 'integration:write',
+    responses: {
+      '200': ok('Rotated, with the new signing secret', responses.inboundWebhookWithSecretResponse),
+    },
+  },
+  {
+    method: 'delete',
+    path: `${ORG}/inbound-webhooks/{inboundWebhookId}`,
+    summary: 'Delete an inbound webhook and its secret',
+    tag: 'webhooks',
+    access: 'integration:write',
+    responses: { '204': noContent('Deleted') },
+  },
+  {
+    method: 'post',
+    path: '/hooks/v1/{organizationId}/{inboundWebhookId}',
+    summary:
+      "Start the webhook's workflow with a signed JSON object as input (no access token; ADR-0024)",
+    tag: 'webhooks',
+    access: 'public',
+    request: z.record(z.string(), z.unknown()),
+    parameters: [
+      {
+        name: 'Operantix-Signature',
+        in: 'header',
+        required: true,
+        description:
+          '`t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`, within 5 minutes',
+        schema: { type: 'string' },
+      },
+      {
+        name: 'Idempotency-Key',
+        in: 'header',
+        required: true,
+        description: 'A repeated key with the same body returns the same execution',
+        schema: { type: 'string', minLength: 1, maxLength: 200 },
+      },
+    ],
+    responses: {
+      '202': ok('Execution started', responses.inboundDeliveryAcceptedResponse),
+      '200': ok('Replay of an earlier delivery', responses.inboundDeliveryAcceptedResponse),
+      '400': error(
+        '`VALIDATION_FAILED`: missing `Idempotency-Key` or a body that is not an object',
+      ),
+      '401': error('`WEBHOOK_SIGNATURE_INVALID`: missing, invalid or expired signature'),
+      '404': error('`INBOUND_WEBHOOK_NOT_FOUND`'),
+      '409': error('`WORKFLOW_INACTIVE` or `IDEMPOTENCY_KEY_REUSED`'),
+      '415': error('`UNSUPPORTED_MEDIA_TYPE`: the body is not `application/json`'),
+    },
+  },
 ];
 
 function responsesFor(operation: Operation): Record<string, Response> {
@@ -408,7 +493,10 @@ export function buildOpenApiDocument(): OpenApiDocument {
         schema:
           name === 'version' ? { type: 'integer', minimum: 1 } : { type: 'string', format: 'uuid' },
       })),
-      ...(operation.parameters ?? []).map((parameter) => ({ ...parameter, required: false })),
+      ...(operation.parameters ?? []).map((parameter) => ({
+        ...parameter,
+        required: parameter.required ?? false,
+      })),
     ];
     const entry: OpenApiOperation = {
       summary: operation.summary,

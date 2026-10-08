@@ -6,7 +6,7 @@ const bytea = customType<{ data: Buffer; driverData: Buffer }>({
   dataType: () => 'bytea',
 });
 
-export const secretKinds = ['WEBHOOK_SIGNING'] as const;
+export const secretKinds = ['WEBHOOK_SIGNING', 'WEBHOOK_INBOUND'] as const;
 export type SecretKind = (typeof secretKinds)[number];
 
 // Owned by the integrations module (ADR-0022). Only ciphertext is stored: the value is sealed

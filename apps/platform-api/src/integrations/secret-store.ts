@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { SecretCipher, secretContext } from '@operantix/secrets';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Transaction } from '../database/database';
 import { type SecretKind, secrets } from './secrets.schema';
 
@@ -9,7 +9,8 @@ export const SECRET_CIPHER = Symbol('SECRET_CIPHER');
 
 /**
  * Stores secrets as references (ADR-0022): callers keep the returned id, never the value. The
- * API only seals; workloads that use a secret open it with the same keyring.
+ * API seals every kind but opens only inbound webhook secrets, to verify signatures (ADR-0024);
+ * other workloads open their kinds with the same keyring.
  */
 @Injectable()
 export class SecretStore {
@@ -32,6 +33,20 @@ export class SecretStore {
       ciphertext: sealed.ciphertext,
     });
     return id;
+  }
+
+  /** Opens an inbound webhook secret; undefined when there is no such secret in the tenant. */
+  async openInbound(
+    tx: Transaction,
+    organizationId: string,
+    id: string,
+  ): Promise<string | undefined> {
+    const [row] = await tx
+      .select({ keyId: secrets.keyId, ciphertext: secrets.ciphertext })
+      .from(secrets)
+      .where(and(eq(secrets.id, id), eq(secrets.kind, 'WEBHOOK_INBOUND')));
+    if (!row) return undefined;
+    return this.cipher.decrypt(row, secretContext(organizationId, id));
   }
 
   async remove(tx: Transaction, id: string): Promise<void> {
