@@ -30,6 +30,7 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 | `WORKER_HTTP_MAX_RESPONSE_BYTES` | `65536` (máx. 1 MiB) |
 | `WORKER_STEP_MAX_ATTEMPTS` | `3` (máx. 10) |
 | `WORKER_RETRY_BASE_DELAY_MS` | `2000` |
+| `SECRETS_ENCRYPTION_KEYS` | obrigatória; o mesmo keyring do `platform-api`, para abrir credenciais de connections (ADR-0025) |
 
 ## Como funciona
 
@@ -82,6 +83,7 @@ pnpm --filter @operantix/workflow-worker start:relay
 
 - `log`: a saída é `{message}`.
 - `http_request`: uma chamada; a saída é `{status, body}` (JSON quando o `content-type` é JSON, senão texto; `truncated: true` acima de `WORKER_HTTP_MAX_RESPONSE_BYTES`). Envia `Idempotency-Key: <executionId>:<stepId>`, estável entre tentativas, para o destino descartar duplicatas. Não segue redirects (`HTTP_REDIRECT_NOT_FOLLOWED`). Mensagens de erro nunca incluem o corpo da resposta, porque qualquer papel do tenant lê os erros dos steps.
+  - Com `connectionId`, o worker lê a connection no escopo do tenant da execução, abre a credencial e envia o header dela (`Authorization: Bearer ...` ou o header configurado), por cima de um header de mesmo nome no passo. A URL precisa ficar dentro do `baseUrl` da connection; senão o passo falha com `CONNECTION_URL_MISMATCH` sem fazer a chamada. Connection inexistente dá `CONNECTION_NOT_FOUND`; credencial que não abre dá `CONNECTION_UNAVAILABLE`. As três falhas são permanentes, e a credencial nunca aparece em saída, erro ou log.
 
 Política de destino (SSRF, `@operantix/http-client`): loopback, redes privadas, link-local (inclui metadata de cloud `169.254.169.254`), CGNAT, multicast e faixas reservadas são recusados com `DESTINATION_BLOCKED`, em IPv4, IPv6 e IPv4 mapeado em IPv6. A checagem roda sobre o endereço resolvido no momento da conexão (hook de `lookup`), então um nome que passa a resolver para um IP privado (DNS rebinding) também é recusado. IPs literais são checados antes de conectar. Em produção, a política não pode ser desligada; egress controlado por rede continua recomendado (`docs/security`).
 

@@ -105,6 +105,9 @@ importers:
       '@operantix/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@operantix/http-client':
+        specifier: workspace:*
+        version: link:../../packages/http-client
       '@operantix/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets

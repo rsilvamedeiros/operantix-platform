@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { ConfigValidationError, loadConfig } from './config';
 
@@ -6,9 +7,24 @@ const required = {
   DATABASE_NAME: 'operantix',
   WORKER_DATABASE_USER: 'operantix_worker',
   WORKER_DATABASE_PASSWORD: 'local-only',
+  // Generated per run so no key material lives in the repo.
+  SECRETS_ENCRYPTION_KEYS: `k1:${randomBytes(32).toString('base64')}`,
 };
 
 describe('loadConfig', () => {
+  it('loads the keyring that opens connection credentials', () => {
+    expect(loadConfig(required).secrets.keyring.active).toBe('k1');
+  });
+
+  it('requires a valid keyring, naming the variable but not the value', () => {
+    const { SECRETS_ENCRYPTION_KEYS: _, ...withoutKeys } = required;
+
+    expect(() => loadConfig(withoutKeys)).toThrow(/SECRETS_ENCRYPTION_KEYS/);
+    expect(() => loadConfig({ ...required, SECRETS_ENCRYPTION_KEYS: 'k1:c2hvcnQ=' })).toThrow(
+      /SECRETS_ENCRYPTION_KEYS/,
+    );
+  });
+
   it('applies defaults', () => {
     const config = loadConfig(required);
 

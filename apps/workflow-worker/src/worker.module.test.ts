@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import { randomBytes } from 'node:crypto';
+import { parseKeyring } from '@operantix/secrets';
 import { NestFactory } from '@nestjs/core';
 import { describe, expect, it } from 'vitest';
 import type { WorkerConfig } from './config';
@@ -13,6 +15,7 @@ const config: WorkerConfig = {
   queue: { batchSize: 1, pollIntervalMs: 10, leaseSeconds: 30 },
   http: { timeoutMs: 1_000, allowPrivateNetworks: false, maxResponseBytes: 1_024 },
   retry: { maxStepAttempts: 3, baseDelayMs: 1_000 },
+  secrets: { keyring: parseKeyring(`k1:${randomBytes(32).toString('base64')}`) },
 };
 
 describe('WorkerModule', () => {
