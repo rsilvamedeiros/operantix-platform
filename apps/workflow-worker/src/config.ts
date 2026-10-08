@@ -4,19 +4,37 @@ import { z } from 'zod';
 const port = z.coerce.number().int().min(1).max(65535);
 const positive = z.coerce.number().int().positive();
 
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  DATABASE_HOST: z.string().min(1),
-  DATABASE_PORT: port.default(5432),
-  DATABASE_NAME: z.string().min(1),
-  // A role of its own, not the API's (ADR-0018): see infrastructure/docker/postgres/worker-role.sql.
-  WORKER_DATABASE_USER: z.string().min(1),
-  WORKER_DATABASE_PASSWORD: z.string().min(1),
-  WORKER_ID: z.string().min(1).optional(),
-  WORKER_BATCH_SIZE: positive.max(100).default(5),
-  WORKER_POLL_INTERVAL_MS: positive.default(1000),
-  WORKER_LEASE_SECONDS: positive.default(60),
-});
+const EnvSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    DATABASE_HOST: z.string().min(1),
+    DATABASE_PORT: port.default(5432),
+    DATABASE_NAME: z.string().min(1),
+    // A role of its own, not the API's (ADR-0018): see infrastructure/docker/postgres/worker-role.sql.
+    WORKER_DATABASE_USER: z.string().min(1),
+    WORKER_DATABASE_PASSWORD: z.string().min(1),
+    WORKER_ID: z.string().min(1).optional(),
+    WORKER_BATCH_SIZE: positive.max(100).default(5),
+    WORKER_POLL_INTERVAL_MS: positive.default(1000),
+    WORKER_LEASE_SECONDS: positive.default(60),
+    WORKER_HTTP_TIMEOUT_MS: positive.default(10_000),
+    WORKER_HTTP_ALLOW_PRIVATE_NETWORKS: z.enum(['true', 'false']).default('false'),
+    WORKER_HTTP_MAX_RESPONSE_BYTES: positive.max(1_048_576).default(65_536),
+    WORKER_STEP_MAX_ATTEMPTS: positive.max(10).default(3),
+    WORKER_RETRY_BASE_DELAY_MS: positive.default(2_000),
+  })
+  .refine(
+    (e) => !(e.NODE_ENV === 'production' && e.WORKER_HTTP_ALLOW_PRIVATE_NETWORKS === 'true'),
+    {
+      path: ['WORKER_HTTP_ALLOW_PRIVATE_NETWORKS'],
+      message: 'Private network access is not allowed in production',
+    },
+  )
+  // A step outliving its lease could be claimed and run twice by another worker.
+  .refine((e) => e.WORKER_HTTP_TIMEOUT_MS < e.WORKER_LEASE_SECONDS * 1000, {
+    path: ['WORKER_HTTP_TIMEOUT_MS'],
+    message: 'Must be shorter than WORKER_LEASE_SECONDS',
+  });
 
 export interface WorkerConfig {
   env: 'development' | 'test' | 'production';
@@ -24,6 +42,8 @@ export interface WorkerConfig {
   workerId: string;
   database: { host: string; port: number; name: string; user: string; password: string };
   queue: { batchSize: number; pollIntervalMs: number; leaseSeconds: number };
+  http: { timeoutMs: number; allowPrivateNetworks: boolean; maxResponseBytes: number };
+  retry: { maxStepAttempts: number; baseDelayMs: number };
 }
 
 export class ConfigValidationError extends Error {
@@ -53,6 +73,15 @@ export function loadConfig(env: Record<string, string | undefined>): WorkerConfi
       batchSize: e.WORKER_BATCH_SIZE,
       pollIntervalMs: e.WORKER_POLL_INTERVAL_MS,
       leaseSeconds: e.WORKER_LEASE_SECONDS,
+    },
+    http: {
+      timeoutMs: e.WORKER_HTTP_TIMEOUT_MS,
+      allowPrivateNetworks: e.WORKER_HTTP_ALLOW_PRIVATE_NETWORKS === 'true',
+      maxResponseBytes: e.WORKER_HTTP_MAX_RESPONSE_BYTES,
+    },
+    retry: {
+      maxStepAttempts: e.WORKER_STEP_MAX_ATTEMPTS,
+      baseDelayMs: e.WORKER_RETRY_BASE_DELAY_MS,
     },
   };
 }

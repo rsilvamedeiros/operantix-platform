@@ -25,7 +25,8 @@ Lifecycle de uma execução e de cada step, tentativas, status, outputs e erros.
 - Start manual idempotente por `Idempotency-Key` (fingerprint SHA-256 do body canônico).
 - Fila `execution_jobs` em PostgreSQL (ADR-0018, ADR-0019): um job por execução, criado na mesma transação; o worker faz lease com `SKIP LOCKED` usando o papel `operantix_worker`.
 - `apps/workflow-worker` faz claim, roda os steps em ordem com resultado commitado por step (retomável após crash), marca a execução `SUCCEEDED`/`FAILED` e apaga o job; `max_attempts` limita claims de uma execução que nunca termina.
-- Ainda não implementado: steps `http_request` e `delay`, classificação de erros para retry e timeline.
+- Step `http_request` com política de destino contra SSRF e `Idempotency-Key` estável por step; erros classificados em retentáveis (reagendados com backoff até `WORKER_STEP_MAX_ATTEMPTS`) e permanentes.
+- Ainda não implementado: step `delay` e timeline.
 
 ## Interfaces
 

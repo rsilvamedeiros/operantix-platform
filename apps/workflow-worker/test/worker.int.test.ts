@@ -5,6 +5,7 @@ import { ExecutionRunner } from '../src/execution/execution-runner';
 import { JobQueue } from '../src/queue/job-queue';
 import { LogStep } from '../src/steps/log-step';
 import { StepDispatcher } from '../src/steps/step-dispatcher';
+import { StepError } from '../src/steps/step-error';
 import type { StepHandler } from '../src/steps/step-handler';
 import { WorkerLoop } from '../src/worker-loop';
 import { type EngineDatabase, startEngineDatabase } from './support/engine-database';
@@ -15,6 +16,7 @@ describe('workflow worker against PostgreSQL', () => {
   let database: EngineDatabase;
   let loop: WorkerLoop;
   let queue: JobQueue;
+  let flakyFailures = 0;
 
   beforeAll(async () => {
     database = await startEngineDatabase();
@@ -29,6 +31,19 @@ describe('workflow worker against PostgreSQL', () => {
       new LogStep(),
       { type: 'boom', run: () => Promise.reject(new Error('remote said no')) },
       {
+        // Fails with a retryable error while `flakyFailures` is positive.
+        type: 'flaky',
+        run: () => {
+          if (flakyFailures <= 0) return Promise.resolve({ recovered: true });
+          flakyFailures -= 1;
+          return Promise.reject(new StepError('UPSTREAM_UNAVAILABLE', 'Upstream is down', true));
+        },
+      },
+      {
+        type: 'refuse',
+        run: () => Promise.reject(new StepError('HTTP_STATUS', 'Destination responded 400', false)),
+      },
+      {
         // Simulates a user cancelling while this step runs.
         type: 'cancel',
         run: async (_step, context) => {
@@ -39,7 +54,13 @@ describe('workflow worker against PostgreSQL', () => {
         },
       },
     ];
-    loop = new WorkerLoop(queue, new ExecutionRunner(db, new StepDispatcher(handlers)), {
+    flakyFailures = 0;
+    const runner = new ExecutionRunner(db, new StepDispatcher(handlers), {
+      maxStepAttempts: 3,
+      // Far in the future, so a test decides when the retry becomes due.
+      baseDelayMs: 600_000,
+    });
+    loop = new WorkerLoop(queue, runner, {
       batchSize: 10,
       pollIntervalMs: 10,
     });
@@ -180,6 +201,89 @@ describe('workflow worker against PostgreSQL', () => {
       ['after', 'PENDING'],
     ]);
     expect(await jobCount(seeded.executionId)).toBe(0);
+  });
+
+  describe('retries', () => {
+    const job = async (executionId: string) =>
+      (
+        await database.owner.query<{
+          due_in_future: boolean;
+          locked_until: Date | null;
+          attempts: number;
+        }>(
+          `SELECT run_after > now() AS due_in_future, locked_until, attempts
+           FROM execution_jobs WHERE execution_id = $1`,
+          [executionId],
+        )
+      ).rows[0];
+    const makeDue = (executionId: string) =>
+      database.owner.query(`UPDATE execution_jobs SET run_after = now() WHERE execution_id = $1`, [
+        executionId,
+      ]);
+    const flaky: WorkflowStep = { id: 'call', name: 'Call', type: 'flaky', config: {} };
+
+    it('reschedules a retryable failure with backoff, then succeeds', async () => {
+      flakyFailures = 1;
+      const seeded = await database.seedExecution([log('before'), flaky]);
+
+      await loop.tick();
+
+      expect(await execution(seeded.executionId)).toMatchObject({ status: 'RUNNING' });
+      expect((await steps(seeded.executionId))[1]).toMatchObject({
+        status: 'PENDING',
+        attempts: 1,
+        error: { code: 'UPSTREAM_UNAVAILABLE', retryable: true },
+      });
+      expect(await job(seeded.executionId)).toEqual({
+        due_in_future: true,
+        locked_until: null,
+        attempts: 0,
+      });
+      expect(await queue.claim(1)).toEqual([]);
+
+      await makeDue(seeded.executionId);
+      await loop.tick();
+
+      expect(await steps(seeded.executionId)).toMatchObject([
+        { status: 'SUCCEEDED', attempts: 1 },
+        { status: 'SUCCEEDED', attempts: 2, output: { recovered: true }, error: null },
+      ]);
+      expect(await execution(seeded.executionId)).toMatchObject({ status: 'SUCCEEDED' });
+      expect(await jobCount(seeded.executionId)).toBe(0);
+    });
+
+    it('fails the execution once the step runs out of attempts', async () => {
+      flakyFailures = 10;
+      const seeded = await database.seedExecution([flaky]);
+
+      await loop.tick();
+      await makeDue(seeded.executionId);
+      await loop.tick();
+      await makeDue(seeded.executionId);
+      await loop.tick();
+
+      expect(await steps(seeded.executionId)).toMatchObject([
+        { status: 'FAILED', attempts: 3, error: { code: 'UPSTREAM_UNAVAILABLE' } },
+      ]);
+      expect(await execution(seeded.executionId)).toMatchObject({
+        status: 'FAILED',
+        error: { code: 'STEP_FAILED', stepId: 'call' },
+      });
+      expect(await jobCount(seeded.executionId)).toBe(0);
+    });
+
+    it('fails at once on a permanent step error', async () => {
+      const seeded = await database.seedExecution([
+        { id: 'call', name: 'Call', type: 'refuse', config: {} },
+      ]);
+
+      await loop.tick();
+
+      expect(await steps(seeded.executionId)).toMatchObject([
+        { status: 'FAILED', attempts: 1, error: { code: 'HTTP_STATUS', retryable: false } },
+      ]);
+      expect(await execution(seeded.executionId)).toMatchObject({ status: 'FAILED' });
+    });
   });
 
   it('resumes an execution a crashed worker left half done', async () => {

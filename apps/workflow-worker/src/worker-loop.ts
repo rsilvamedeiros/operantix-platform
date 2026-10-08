@@ -47,7 +47,8 @@ export class WorkerLoop {
       };
       try {
         const outcome = await this.runner.run(job);
-        await this.queue.complete(job.id);
+        // A rescheduled job stays queued with its new run_after.
+        if (outcome !== 'RESCHEDULED') await this.queue.complete(job.id);
         this.logger.log({ ...scope, outcome, msg: 'Job completed' });
       } catch (error) {
         this.logger.error({

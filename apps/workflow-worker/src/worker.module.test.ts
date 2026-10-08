@@ -11,6 +11,8 @@ const config: WorkerConfig = {
   // Nothing listens on port 1: claims fail, are logged, and polling goes on.
   database: { host: '127.0.0.1', port: 1, name: 'none', user: 'none', password: 'none' },
   queue: { batchSize: 1, pollIntervalMs: 10, leaseSeconds: 30 },
+  http: { timeoutMs: 1_000, allowPrivateNetworks: false, maxResponseBytes: 1_024 },
+  retry: { maxStepAttempts: 3, baseDelayMs: 1_000 },
 };
 
 describe('WorkerModule', () => {
