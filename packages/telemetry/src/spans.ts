@@ -85,6 +85,13 @@ export function traceContextFor(traceId: string, parent: Context = context.activ
 export function injectTraceContext(carrier: Record<string, string>, span?: Span): void {
   const source = span === undefined ? context.active() : trace.setSpan(context.active(), span);
   propagation.inject(source, carrier);
+  // Without a registered propagator (tracing not started) the call above writes nothing, but the
+  // trace id the event already carries should still reach the consumer.
+  const spanContext = trace.getSpanContext(source);
+  if (carrier.traceparent === undefined && spanContext && trace.isSpanContextValid(spanContext)) {
+    const flags = (spanContext.traceFlags & TraceFlags.SAMPLED) === 0 ? '00' : '01';
+    carrier.traceparent = `00-${spanContext.traceId}-${spanContext.spanId}-${flags}`;
+  }
 }
 
 /** Context carried by message headers, or the root context when there is none or it is garbled. */

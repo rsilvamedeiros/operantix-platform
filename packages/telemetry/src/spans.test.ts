@@ -113,4 +113,16 @@ describe('spans', () => {
     expect(second?.status.code).toBe(SpanStatusCode.ERROR);
     expect(second?.events.map((e) => e.name)).toContain('exception');
   });
+
+  it('still writes a traceparent when tracing is not started, so traces are not lost on the wire', async () => {
+    await handle.shutdown();
+    const span = startSpan('producer', { parent: traceContextFor(TRACE_ID) });
+    const carrier: Record<string, string> = {};
+    injectTraceContext(carrier, span);
+    expect(carrier.traceparent).toBe(`00-${TRACE_ID}-${span.spanContext().spanId}-01`);
+    handle = startTracing(
+      { serviceName: 'test', environment: 'test', endpoint: 'http://unused:4318', sampleRatio: 1 },
+      { spanExporter: exporter, instrument: false },
+    );
+  });
 });
