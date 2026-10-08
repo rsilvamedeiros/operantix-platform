@@ -28,13 +28,18 @@ describe('OpenAPI document', () => {
     expect(documented).toEqual(served);
   });
 
-  it('requires a bearer token everywhere except the public probes and the spec itself', () => {
+  it('requires a bearer token everywhere except the public probes, the spec and inbound webhooks', () => {
     const publicRoutes = operationsOf(doc)
       .filter((o) => o.operation.security?.length === 0)
       .map((o) => o.route)
       .sort();
 
-    expect(publicRoutes).toEqual(['GET /health/live', 'GET /health/ready', 'GET /openapi.json']);
+    expect(publicRoutes).toEqual([
+      'GET /health/live',
+      'GET /health/ready',
+      'GET /openapi.json',
+      'POST /hooks/v1/{organizationId}/{inboundWebhookId}',
+    ]);
     expect(doc.security).toEqual([{ bearerAuth: [] }]);
   });
 

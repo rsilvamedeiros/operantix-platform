@@ -165,3 +165,22 @@ export const webhookDeliveryDetailResponse = webhookDeliveryResponse.extend({
     }),
   ),
 });
+
+export const inboundWebhookResponse = z.object({
+  id: z.uuid(),
+  workflowId: z.uuid(),
+  description: z.string().nullable(),
+  path: z.string().describe('Where senders POST, relative to the API origin'),
+  createdAt: timestamp,
+});
+
+export const inboundWebhooksResponse = z.object({ data: z.array(inboundWebhookResponse) });
+
+export const inboundWebhookWithSecretResponse = inboundWebhookResponse.extend({
+  signingSecret: z
+    .string()
+    .regex(/^whsec_[A-Za-z0-9_-]{43}$/)
+    .describe('Shown only now; senders sign `Operantix-Signature` headers with it'),
+});
+
+export const inboundDeliveryAcceptedResponse = z.object({ executionId: z.uuid() });

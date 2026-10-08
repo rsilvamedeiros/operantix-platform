@@ -7,7 +7,8 @@ export async function createApp(
   config: AppConfig,
   options: NestApplicationOptions = {},
 ): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule.register(config), options);
+  // The raw body is kept for inbound webhook signatures, which cover the bytes as sent.
+  const app = await NestFactory.create(AppModule.register(config), { ...options, rawBody: true });
   app.enableShutdownHooks();
   return app;
 }

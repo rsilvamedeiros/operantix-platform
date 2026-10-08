@@ -1,4 +1,3 @@
-import { randomBytes } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { asc, eq } from 'drizzle-orm';
 import { recordAudit } from '../audit/audit-log';
@@ -6,6 +5,7 @@ import { type Database, type Transaction, withTenant } from '../database/databas
 import { DATABASE } from '../database/database.tokens';
 import type { TenantContext } from '../tenancy/tenant-context';
 import { SecretStore } from './secret-store';
+import { newSigningSecret } from './signing-secret';
 import type {
   CreateWebhookEndpointInput,
   SetWebhookEndpointStatusInput,
@@ -27,11 +27,6 @@ const endpointView = {
   consecutiveFailures: webhookEndpoints.consecutiveFailures,
   createdAt: webhookEndpoints.createdAt,
 };
-
-/** 32 random bytes; the prefix makes a leaked secret easy to recognize and scan for. */
-function newSigningSecret(): string {
-  return `whsec_${randomBytes(32).toString('base64url')}`;
-}
 
 // All queries run under the tenant's RLS scope; ids of other tenants simply match nothing.
 @Injectable()

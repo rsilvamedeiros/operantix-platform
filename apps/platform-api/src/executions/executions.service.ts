@@ -42,6 +42,10 @@ const executionView = {
   finishedAt: executions.finishedAt,
 };
 
+/** What started an execution: a member through the API, or a signed inbound webhook. */
+export type ExecutionTrigger =
+  { type: 'manual'; userId: string } | { type: 'webhook'; inboundWebhookId: string };
+
 export interface StartResult {
   execution: ExecutionDetailView;
   /** False when an earlier request with the same idempotency key already created it. */
@@ -62,8 +66,29 @@ export class ExecutionsService {
     request: StartExecutionInput,
     idempotencyKey: string | undefined,
   ): Promise<StartResult> {
+    return this.startTriggered(
+      tenant.organizationId,
+      workflowId,
+      { type: 'manual', userId: tenant.userId },
+      request,
+      idempotencyKey,
+    );
+  }
+
+  /**
+   * Starts an execution on behalf of any trigger. Callers authorize first: this only checks
+   * that the workflow exists in the organization and has an active version.
+   */
+  startTriggered(
+    organizationId: string,
+    workflowId: string,
+    trigger: ExecutionTrigger,
+    request: StartExecutionInput,
+    idempotencyKey: string | undefined,
+  ): Promise<StartResult> {
     const fingerprint = idempotencyKey ? sha256(canonicalJson(request)) : null;
-    return withTenant(this.db, tenant.organizationId, async (tx) => {
+    const triggeredBy = trigger.type === 'manual' ? trigger.userId : null;
+    return withTenant(this.db, organizationId, async (tx) => {
       if (idempotencyKey && fingerprint) {
         const replay = await findByKey(tx, workflowId, idempotencyKey, fingerprint);
         if (replay) return { execution: replay, created: false };
@@ -90,11 +115,11 @@ export class ExecutionsService {
       const [created] = await tx
         .insert(executions)
         .values({
-          organizationId: tenant.organizationId,
+          organizationId,
           workflowId,
           workflowVersion: version,
-          triggerType: 'manual',
-          triggeredBy: tenant.userId,
+          triggerType: trigger.type,
+          triggeredBy,
           idempotencyKey: idempotencyKey ?? null,
           requestFingerprint: fingerprint,
           input: request.input,
@@ -114,21 +139,23 @@ export class ExecutionsService {
         .insert(stepExecutions)
         .values(
           definition.steps.map((step, position) => ({
-            organizationId: tenant.organizationId,
+            organizationId,
             executionId: created.id,
             stepId: step.id,
             position,
           })),
         )
         .returning(stepView);
-      await tx
-        .insert(executionJobs)
-        .values({ organizationId: tenant.organizationId, executionId: created.id });
+      await tx.insert(executionJobs).values({ organizationId, executionId: created.id });
       await tx.insert(executionEvents).values({
-        organizationId: tenant.organizationId,
+        organizationId,
         executionId: created.id,
         type: 'execution.created',
-        details: { triggerType: created.triggerType, triggeredBy: created.triggeredBy },
+        details: {
+          triggerType: created.triggerType,
+          triggeredBy: created.triggeredBy,
+          ...(trigger.type === 'webhook' ? { inboundWebhookId: trigger.inboundWebhookId } : {}),
+        },
       });
       return { execution: { ...created, steps }, created: true };
     });
