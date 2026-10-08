@@ -19,6 +19,8 @@ import { DATABASE } from './database/database.tokens';
 import { ExecutionsController } from './executions/executions.controller';
 import { ExecutionsService } from './executions/executions.service';
 import { SECRET_CIPHER, SecretStore } from './integrations/secret-store';
+import { ConnectionsController } from './integrations/connections.controller';
+import { ConnectionsService } from './integrations/connections.service';
 import { InboundWebhookReceiverController } from './integrations/inbound-webhook-receiver.controller';
 import { InboundWebhooksController } from './integrations/inbound-webhooks.controller';
 import { InboundWebhooksService } from './integrations/inbound-webhooks.service';
@@ -69,6 +71,7 @@ export const CONTROLLERS = [
   WebhookDeliveriesController,
   InboundWebhooksController,
   InboundWebhookReceiverController,
+  ConnectionsController,
   OpenApiController,
 ];
 
@@ -121,6 +124,7 @@ export class AppModule {
         WebhookEndpointsService,
         WebhookDeliveriesService,
         InboundWebhooksService,
+        ConnectionsService,
         ConnectionsLifecycle,
       ],
     };

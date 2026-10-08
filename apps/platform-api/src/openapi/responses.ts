@@ -184,3 +184,15 @@ export const inboundWebhookWithSecretResponse = inboundWebhookResponse.extend({
 });
 
 export const inboundDeliveryAcceptedResponse = z.object({ executionId: z.uuid() });
+
+export const connectionResponse = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  baseUrl: z.url(),
+  authType: z.enum(['bearer', 'header']),
+  headerName: z.string().nullable(),
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
+export const connectionsResponse = z.object({ data: z.array(connectionResponse) });
