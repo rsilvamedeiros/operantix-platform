@@ -29,7 +29,10 @@ describe('integration worker database role', () => {
       password,
     });
     for (const org of [acme, globex]) {
-      await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $1, $1)`, [org]);
+      await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $2)`, [
+        org,
+        `org-${org}`,
+      ]);
       const secretId = randomUUID();
       await owner.query(
         `INSERT INTO secrets (id, organization_id, kind, key_id, ciphertext)
@@ -68,9 +71,9 @@ describe('integration worker database role', () => {
   };
 
   const insertDelivery = (client: PoolClient, org: string) =>
-    client.query<{ id: string }>(
+    client.query(
       `INSERT INTO webhook_deliveries (organization_id, endpoint_id, event_id, event_type, payload)
-       VALUES ($1, $2, $3, 'execution.completed', '{}') RETURNING id`,
+       VALUES ($1, $2, $3, 'execution.completed', '{}')`,
       [org, endpoints[org], randomUUID()],
     );
 
@@ -110,12 +113,13 @@ describe('integration worker database role', () => {
         `SELECT id FROM webhook_deliveries WHERE organization_id = $1`,
         [acme],
       );
-      const inserted = await c.query<{ id: string }>(
-        `INSERT INTO webhook_delivery_attempts (organization_id, delivery_id, attempt, status_code, duration_ms)
-         VALUES ($1, $2, 1, 503, 12) RETURNING id`,
-        [acme, rows[0]?.id],
+      const id = randomUUID();
+      await c.query(
+        `INSERT INTO webhook_delivery_attempts (id, organization_id, delivery_id, attempt, status_code, duration_ms)
+         VALUES ($1, $2, $3, 1, 503, 12)`,
+        [id, acme, rows[0]?.id],
       );
-      return inserted.rows[0]?.id;
+      return id;
     });
 
     await expect(

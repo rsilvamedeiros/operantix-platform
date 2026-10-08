@@ -56,7 +56,10 @@ export async function startIntegrationDatabase(): Promise<IntegrationDatabase> {
     keyring,
     seedOrganization: async () => {
       const id = randomUUID();
-      await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $1, $1)`, [id]);
+      await owner.query(`INSERT INTO organizations (id, name, slug) VALUES ($1, $2, $2)`, [
+        id,
+        `org-${id}`,
+      ]);
       return id;
     },
     seedEndpoint: async (organizationId, options) => {

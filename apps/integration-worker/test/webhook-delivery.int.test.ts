@@ -247,6 +247,24 @@ describe('webhook delivery', () => {
       ]);
     });
 
+    it('fails a delivery that a crashing worker claimed too often, without sending it', async () => {
+      const org = await database.seedOrganization();
+      const endpoint = await database.seedEndpoint(org, { url: receiver.url('/crashy') });
+      await fanOut.handle(completedEvent(org));
+      // Each crash leaves a claim behind; the lease expired and the row is due again.
+      await database.owner.query(
+        'UPDATE webhook_deliveries SET attempts = $2 WHERE endpoint_id = $1',
+        [endpoint.id, delivery.maxAttempts],
+      );
+
+      await dispatcher.tick();
+
+      expect(receiver.received).toHaveLength(0);
+      expect(await deliveriesOf(endpoint.id)).toMatchObject([
+        { status: 'FAILED', last_error_code: 'MAX_ATTEMPTS_EXCEEDED' },
+      ]);
+    });
+
     it('skips a delivery whose endpoint was deleted', async () => {
       const org = await database.seedOrganization();
       const endpoint = await database.seedEndpoint(org, { url: receiver.url('/deleted') });
