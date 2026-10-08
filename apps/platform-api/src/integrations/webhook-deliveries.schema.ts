@@ -46,6 +46,8 @@ export const webhookDeliveries = pgTable(
       columns: [t.organizationId, t.endpointId],
       foreignColumns: [webhookEndpoints.organizationId, webhookEndpoints.id],
     }).onDelete('cascade'),
+    // Serves the per-endpoint history, newest first, with its keyset cursor.
+    index('webhook_deliveries_endpoint_created_idx').on(t.endpointId, t.createdAt, t.id),
     index('webhook_deliveries_due_idx')
       .on(t.nextAttemptAt)
       .where(sql`${t.status} = 'PENDING'`),

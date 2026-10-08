@@ -19,6 +19,8 @@ import { DATABASE } from './database/database.tokens';
 import { ExecutionsController } from './executions/executions.controller';
 import { ExecutionsService } from './executions/executions.service';
 import { SECRET_CIPHER, SecretStore } from './integrations/secret-store';
+import { WebhookDeliveriesController } from './integrations/webhook-deliveries.controller';
+import { WebhookDeliveriesService } from './integrations/webhook-deliveries.service';
 import { WebhookEndpointsController } from './integrations/webhook-endpoints.controller';
 import { WebhookEndpointsService } from './integrations/webhook-endpoints.service';
 import { HealthController } from './health/health.controller';
@@ -61,6 +63,7 @@ export const CONTROLLERS = [
   WorkflowsController,
   ExecutionsController,
   WebhookEndpointsController,
+  WebhookDeliveriesController,
   OpenApiController,
 ];
 
@@ -111,6 +114,7 @@ export class AppModule {
         { provide: SECRET_CIPHER, useValue: new SecretCipher(config.secrets.keyring) },
         SecretStore,
         WebhookEndpointsService,
+        WebhookDeliveriesService,
         ConnectionsLifecycle,
       ],
     };

@@ -122,6 +122,7 @@ export const webhookEndpointResponse = z.object({
   description: z.string().nullable(),
   eventTypes: z.array(z.string()),
   status: z.enum(['ACTIVE', 'DISABLED']),
+  consecutiveFailures: z.int().min(0),
   createdAt: timestamp,
 });
 
@@ -132,4 +133,35 @@ export const webhookEndpointWithSecretResponse = webhookEndpointResponse.extend(
     .string()
     .regex(/^whsec_[A-Za-z0-9_-]{43}$/)
     .describe('Shown only now; store it to verify `Operantix-Signature` headers'),
+});
+
+const webhookDeliveryResponse = z.object({
+  id: z.uuid(),
+  endpointId: z.uuid(),
+  eventId: z.uuid(),
+  eventType: z.string(),
+  status: z.enum(['PENDING', 'SUCCEEDED', 'FAILED']),
+  attempts: z.int().min(0),
+  nextAttemptAt: timestamp,
+  lastStatusCode: z.int().nullable(),
+  lastErrorCode: z.string().nullable(),
+  createdAt: timestamp,
+  completedAt: timestamp.nullable(),
+});
+
+export const webhookDeliveryPageResponse = z.object({
+  data: z.array(webhookDeliveryResponse),
+  nextCursor: z.string().nullable(),
+});
+
+export const webhookDeliveryDetailResponse = webhookDeliveryResponse.extend({
+  attemptHistory: z.array(
+    z.object({
+      attempt: z.int().min(1),
+      statusCode: z.int().nullable(),
+      errorCode: z.string().nullable(),
+      durationMs: z.int().min(0),
+      attemptedAt: timestamp,
+    }),
+  ),
 });
