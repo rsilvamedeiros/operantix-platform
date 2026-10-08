@@ -8,7 +8,10 @@ import {
   createWorkflowVersionSchema,
 } from '../workflows/workflow.dto';
 import { startExecutionSchema } from '../executions/execution.dto';
-import { createWebhookEndpointSchema } from '../integrations/webhook-endpoint.dto';
+import {
+  createWebhookEndpointSchema,
+  setWebhookEndpointStatusSchema,
+} from '../integrations/webhook-endpoint.dto';
 import * as responses from './responses';
 
 type Method = 'get' | 'post' | 'put' | 'delete';
@@ -45,6 +48,20 @@ const noContent = (description: string): Response => ({ description });
 
 const ORG = '/api/v1/organizations/{organizationId}';
 const invalidBody = error('`VALIDATION_FAILED`: the body does not match the schema');
+const pageParameters: Parameter[] = [
+  {
+    name: 'limit',
+    in: 'query',
+    description: 'Page size',
+    schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
+  },
+  {
+    name: 'cursor',
+    in: 'query',
+    description: '`nextCursor` of the previous page',
+    schema: { type: 'string' },
+  },
+];
 
 // Single source of the HTTP contract. A unit test checks it lists exactly the controllers'
 // routes; an integration test checks real responses against these schemas.
@@ -226,20 +243,7 @@ const OPERATIONS: Operation[] = [
     summary: 'Executions of a workflow, newest first',
     tag: 'executions',
     access: 'execution:read',
-    parameters: [
-      {
-        name: 'limit',
-        in: 'query',
-        description: 'Page size',
-        schema: { type: 'integer', minimum: 1, maximum: 100, default: 20 },
-      },
-      {
-        name: 'cursor',
-        in: 'query',
-        description: '`nextCursor` of the previous page',
-        schema: { type: 'string' },
-      },
-    ],
+    parameters: pageParameters,
     responses: {
       '200': ok('A page of executions', responses.executionPageResponse),
       '400': error('`VALIDATION_FAILED`: invalid `limit` or `cursor`'),
@@ -299,6 +303,51 @@ const OPERATIONS: Operation[] = [
       '200': ok(
         'Rotated, with the new signing secret',
         responses.webhookEndpointWithSecretResponse,
+      ),
+    },
+  },
+  {
+    method: 'put',
+    path: `${ORG}/webhook-endpoints/{endpointId}/status`,
+    summary: 'Enable or disable an endpoint; enabling clears its failure count',
+    tag: 'webhooks',
+    access: 'integration:write',
+    request: setWebhookEndpointStatusSchema,
+    responses: {
+      '200': ok('Webhook endpoint', responses.webhookEndpointResponse),
+      '400': invalidBody,
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/webhook-endpoints/{endpointId}/deliveries`,
+    summary: 'Deliveries to an endpoint, newest first (without payloads)',
+    tag: 'webhooks',
+    access: 'integration:read',
+    parameters: pageParameters,
+    responses: {
+      '200': ok('A page of deliveries', responses.webhookDeliveryPageResponse),
+      '400': error('`VALIDATION_FAILED`: invalid `limit` or `cursor`'),
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}`,
+    summary: 'A delivery with its attempts, oldest first',
+    tag: 'webhooks',
+    access: 'integration:read',
+    responses: { '200': ok('Delivery', responses.webhookDeliveryDetailResponse) },
+  },
+  {
+    method: 'post',
+    path: `${ORG}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}/retry`,
+    summary: 'Queue a failed delivery again, with a fresh attempt budget',
+    tag: 'webhooks',
+    access: 'integration:write',
+    responses: {
+      '200': ok('Queued again', responses.webhookDeliveryDetailResponse),
+      '409': error(
+        '`WEBHOOK_DELIVERY_NOT_FAILED` (still pending or succeeded) or `WEBHOOK_ENDPOINT_DISABLED`',
       ),
     },
   },

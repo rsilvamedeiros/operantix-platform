@@ -8,6 +8,7 @@ import type { TenantContext } from '../tenancy/tenant-context';
 import { SecretStore } from './secret-store';
 import type {
   CreateWebhookEndpointInput,
+  SetWebhookEndpointStatusInput,
   WebhookEndpointView,
   WebhookEndpointWithSecretView,
 } from './webhook-endpoint.dto';
@@ -23,6 +24,7 @@ const endpointView = {
   description: webhookEndpoints.description,
   eventTypes: webhookEndpoints.eventTypes,
   status: webhookEndpoints.status,
+  consecutiveFailures: webhookEndpoints.consecutiveFailures,
   createdAt: webhookEndpoints.createdAt,
 };
 
@@ -116,6 +118,44 @@ export class WebhookEndpointsService {
         resourceId: endpointId,
       });
       return { ...rotated, signingSecret };
+    });
+  }
+
+  /**
+   * Enables or disables an endpoint. Enabling clears the failure count, so the breaker starts
+   * over; setting the current status again changes nothing and is not audited.
+   */
+  setStatus(
+    tenant: TenantContext,
+    endpointId: string,
+    input: SetWebhookEndpointStatusInput,
+  ): Promise<WebhookEndpointView> {
+    return withTenant(this.db, tenant.organizationId, async (tx) => {
+      const [current] = await tx
+        .select(endpointView)
+        .from(webhookEndpoints)
+        .where(eq(webhookEndpoints.id, endpointId))
+        .for('update');
+      if (!current) throw new WebhookEndpointNotFoundError(endpointId);
+      if (current.status === input.status) return current;
+      const [updated] = await tx
+        .update(webhookEndpoints)
+        .set(
+          input.status === 'ACTIVE'
+            ? { status: 'ACTIVE', consecutiveFailures: 0 }
+            : { status: 'DISABLED' },
+        )
+        .where(eq(webhookEndpoints.id, endpointId))
+        .returning(endpointView);
+      if (!updated) throw new WebhookEndpointNotFoundError(endpointId);
+      await recordAudit(tx, tenant, {
+        action:
+          input.status === 'ACTIVE' ? 'webhook_endpoint.enabled' : 'webhook_endpoint.disabled',
+        resourceType: 'webhook_endpoint',
+        resourceId: endpointId,
+        metadata: { consecutiveFailures: current.consecutiveFailures },
+      });
+      return updated;
     });
   }
 

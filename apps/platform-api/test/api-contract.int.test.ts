@@ -150,6 +150,37 @@ describe('API responses match the OpenAPI contract', () => {
     await call('get', `${base}/webhook-endpoints`, ids);
     await call('get', `${base}/webhook-endpoints/{endpointId}`, endpointIds);
     await call('post', `${base}/webhook-endpoints/{endpointId}/rotate-secret`, endpointIds);
+    await call('put', `${base}/webhook-endpoints/{endpointId}/status`, endpointIds, {
+      status: 'DISABLED',
+    });
+    await call('put', `${base}/webhook-endpoints/{endpointId}/status`, endpointIds, {
+      status: 'PAUSED',
+    }); // 400
+    const { rows: seeded } = await database.ownerPool.query<{ id: string }>(
+      `INSERT INTO webhook_deliveries (organization_id, endpoint_id, event_id, event_type, payload, status)
+       VALUES ($1, $2, gen_random_uuid(), 'execution.completed', '{}', 'FAILED') RETURNING id`,
+      [organizationId, endpointId],
+    );
+    const deliveryIds = { ...endpointIds, deliveryId: seeded[0]?.id ?? '' };
+    await call('get', `${base}/webhook-endpoints/{endpointId}/deliveries`, endpointIds);
+    await call(
+      'get',
+      `${base}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}`,
+      deliveryIds,
+    );
+    await call(
+      'post',
+      `${base}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}/retry`,
+      deliveryIds,
+    ); // 409 disabled
+    await call('put', `${base}/webhook-endpoints/{endpointId}/status`, endpointIds, {
+      status: 'ACTIVE',
+    });
+    await call(
+      'post',
+      `${base}/webhook-endpoints/{endpointId}/deliveries/{deliveryId}/retry`,
+      deliveryIds,
+    );
     await call('delete', `${base}/webhook-endpoints/{endpointId}`, endpointIds);
     await call('get', `${base}/webhook-endpoints/{endpointId}`, endpointIds); // 404
   });

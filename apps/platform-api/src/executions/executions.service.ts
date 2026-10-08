@@ -3,6 +3,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { type Database, type Transaction, withTenant } from '../database/database';
 import { DATABASE } from '../database/database.tokens';
 import { canonicalJson, sha256 } from '../shared/canonical-json';
+import { decodeCursor, encodeCursor } from '../shared/keyset-cursor';
 import type { TenantContext } from '../tenancy/tenant-context';
 import { workflows, workflowVersions } from '../workflows/workflows.schema';
 import type {
@@ -26,9 +27,6 @@ export class WorkflowInactiveError extends Error {
 export class IdempotencyKeyReusedError extends Error {
   override name = 'IdempotencyKeyReusedError';
 }
-export class InvalidCursorError extends Error {
-  override name = 'InvalidCursorError';
-}
 
 const executionView = {
   id: executions.id,
@@ -43,8 +41,6 @@ const executionView = {
   startedAt: executions.startedAt,
   finishedAt: executions.finishedAt,
 };
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface StartResult {
   execution: ExecutionDetailView;
@@ -183,7 +179,6 @@ export class ExecutionsService {
         .where(eq(workflows.id, workflowId));
       if (!workflow) throw new ExecutionWorkflowNotFoundError(workflowId);
 
-      // Compares against the cursor row itself, so timestamps keep full precision.
       const page = await tx
         .select(executionView)
         .from(executions)
@@ -247,14 +242,4 @@ async function findByKey(
   if (!existing) return undefined;
   if (existing.fingerprint !== fingerprint) throw new IdempotencyKeyReusedError(idempotencyKey);
   return detail(tx, eq(executions.id, existing.id));
-}
-
-function encodeCursor(executionId: string): string {
-  return Buffer.from(executionId).toString('base64url');
-}
-
-function decodeCursor(cursor: string): string {
-  const id = Buffer.from(cursor, 'base64url').toString();
-  if (!UUID.test(id)) throw new InvalidCursorError(cursor);
-  return id;
 }
