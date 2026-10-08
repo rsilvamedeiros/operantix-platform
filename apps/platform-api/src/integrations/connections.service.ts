@@ -17,9 +17,13 @@ import type {
 } from './connection.dto';
 import { connections } from './connections.schema';
 import { SecretStore } from './secret-store';
+import { isUsedByActiveVersion } from './step-connections';
 
 export class ConnectionNotFoundError extends Error {
   override name = 'ConnectionNotFoundError';
+}
+export class ConnectionInUseError extends Error {
+  override name = 'ConnectionInUseError';
 }
 export class ConnectionNameTakenError extends Error {
   override name = 'ConnectionNameTakenError';
@@ -140,8 +144,13 @@ export class ConnectionsService {
     });
   }
 
+  /** Refused while an active workflow version uses the connection, or its steps would fail. */
   remove(tenant: TenantContext, connectionId: string): Promise<void> {
     return withTenant(this.db, tenant.organizationId, async (tx) => {
+      await lockSecretId(tx, connectionId);
+      if (await isUsedByActiveVersion(tx, connectionId)) {
+        throw new ConnectionInUseError(connectionId);
+      }
       const [deleted] = await tx
         .delete(connections)
         .where(eq(connections.id, connectionId))

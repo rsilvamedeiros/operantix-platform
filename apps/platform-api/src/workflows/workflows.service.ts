@@ -1,3 +1,4 @@
+import { assertStepConnections } from '../integrations/step-connections';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { recordAudit } from '../audit/audit-log';
@@ -240,6 +241,7 @@ async function insertVersion(
   version: number,
   definition: WorkflowDefinition,
 ): Promise<WorkflowVersionView> {
+  await assertStepConnections(tx, definition);
   const [created] = await tx
     .insert(workflowVersions)
     .values({

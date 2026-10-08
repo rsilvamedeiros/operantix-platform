@@ -127,6 +127,8 @@ O secret fica em `secrets`, cifrado com AES-256-GCM pelo keyring de `SECRETS_ENC
 
 `/api/v1/organizations/{organizationId}/connections` guarda credenciais para passos HTTP (ADR-0025): `name` (identificador único na organização), `baseUrl` (`http`/`https`, sem credenciais, query ou fragmento) e `auth`, que é `{"type":"bearer","token":"..."}` ou `{"type":"header","headerName":"X-Api-Key","value":"..."}`. A credencial vai para `secrets` (`CONNECTION_CREDENTIAL`) e nunca volta pela API; `PUT .../{connectionId}/credential` troca a credencial, e `DELETE` apaga a connection e o secret. Ler exige `integration:read`; o resto, `integration:write`. Tudo é auditado, sem o valor.
 
+Um passo `http_request` usa a connection com `"connectionId": "<id>"` em `config`. Ao publicar uma versão, a API confere que a connection existe na organização e que a URL do passo fica dentro do `baseUrl`; senão responde `400` apontando `definition.steps.N.config.connectionId`. Apagar uma connection que uma versão ativa usa dá `409 CONNECTION_IN_USE`.
+
 ## Inbound webhooks
 
 `/api/v1/organizations/{organizationId}/inbound-webhooks` cria, lista, lê, rotaciona e apaga URLs assinadas que iniciam um workflow (`integration:read` para ler, `integration:write` para o resto). A rota pública `POST /hooks/v1/{organizationId}/{inboundWebhookId}` não usa token: verifica `Operantix-Signature` sobre o corpo cru (o app mantém `rawBody`), exige `Idempotency-Key` e inicia a execução com `triggerType: "webhook"` (ADR-0024, `docs/api/webhooks.md`). É o único lugar em que a API abre um secret, e só do tipo `WEBHOOK_INBOUND`.

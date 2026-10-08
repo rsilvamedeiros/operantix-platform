@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   ConflictException,
   Controller,
@@ -9,6 +10,7 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
+import { StepConnectionError } from '../integrations/step-connections';
 import { RequirePermission } from '../authorization/require-permission.decorator';
 import { PositiveIntParamPipe, UuidParamPipe } from '../shared/path-params';
 import { ZodValidationPipe } from '../shared/zod-validation.pipe';
@@ -48,6 +50,13 @@ function toHttp(error: unknown): unknown {
   if (error instanceof WorkspaceNotFoundError) return workspaceNotFound();
   if (error instanceof WorkflowNotFoundError) return workflowNotFound();
   if (error instanceof WorkflowVersionNotFoundError) return versionNotFound();
+  if (error instanceof StepConnectionError) {
+    return new BadRequestException({
+      code: 'VALIDATION_FAILED',
+      message: 'Request body is invalid',
+      details: { fields: error.fields.map((field) => `definition.${field}`) },
+    });
+  }
   if (error instanceof WorkflowKeyTakenError) {
     return new ConflictException({
       code: 'WORKFLOW_KEY_TAKEN',

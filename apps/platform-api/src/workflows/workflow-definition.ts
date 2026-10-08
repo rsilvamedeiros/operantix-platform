@@ -16,7 +16,7 @@ const trigger = z.discriminatedUnion('type', [
 ]);
 
 // Definitions are stored in plain text and readable by every role, so credentials must not be
-// inlined. Secret references for HTTP steps arrive with integrations (M05).
+// inlined; HTTP steps reference a connection instead (ADR-0025).
 const CREDENTIAL_HEADER = /^(authorization|proxy-authorization|cookie|x-api-key|x-auth-token)$/i;
 const headers = z
   .record(z.string(), z.string())
@@ -40,6 +40,8 @@ const step = z.discriminatedUnion('type', [
       url: z.url({ protocol: /^https?$/ }),
       headers: headers.optional(),
       body: z.unknown().optional(),
+      // Credentials come from a connection of the organization (ADR-0025); checked on publish.
+      connectionId: z.uuid().optional(),
     }),
   }),
   z.strictObject({

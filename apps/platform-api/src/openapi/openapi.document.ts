@@ -455,7 +455,10 @@ const OPERATIONS: Operation[] = [
     summary: 'Delete a connection and its credential',
     tag: 'connections',
     access: 'integration:write',
-    responses: { '204': noContent('Deleted') },
+    responses: {
+      '204': noContent('Deleted'),
+      '409': error('`CONNECTION_IN_USE`: an active workflow version uses it'),
+    },
   },
   {
     method: 'post',
