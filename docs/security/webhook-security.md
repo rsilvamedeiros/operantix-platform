@@ -19,5 +19,5 @@
 
 ## Implemented state
 
-- Outbound: cada webhook endpoint tem um signing secret próprio (`whsec_...`), cifrado em repouso (ADR-0022), mostrado só na criação e rotacionável na hora (`POST .../rotate-secret`). A assinatura das entregas e o histórico de tentativas chegam com o integration worker.
+- Outbound: cada webhook endpoint tem um signing secret próprio (`whsec_...`), cifrado em repouso (ADR-0022), mostrado só na criação e rotacionável na hora (`POST .../rotate-secret`). O integration worker assina cada entrega (`Operantix-Signature`, HMAC-SHA256 sobre `<t>.<corpo>`), aplica timeout e retries limitados, grava o histórico de tentativas e desativa o endpoint depois de falhas seguidas (ADR-0023, `docs/api/webhooks.md`).
 - Inbound: ainda não implementado.

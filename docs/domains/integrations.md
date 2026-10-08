@@ -38,4 +38,5 @@ O owner do dado é o módulo que define suas invariantes. Outros componentes ace
 
 - `WebhookEndpoint` (`webhook_endpoints`): URL, tipos de evento assinados, status `ACTIVE`/`DISABLED` e a referência ao signing secret. API em `/api/v1/organizations/{organizationId}/webhook-endpoints`.
 - `CredentialReference` (`secrets`): valor cifrado por tenant, nunca devolvido depois da criação (ADR-0022).
-- Ainda não implementados: `Connection`, `Connector` e a entrega (integration worker).
+- `WebhookDelivery` (`webhook_deliveries`, `webhook_delivery_attempts`): uma entrega por endpoint e evento, com tentativas e saúde do endpoint, feita pelo integration worker (ADR-0023).
+- Ainda não implementados: `Connection` e `Connector`.
