@@ -33,3 +33,9 @@ O owner do dado é o módulo que define suas invariantes. Outros componentes ace
 - transições de estado;
 - concorrência relevante;
 - erros de domínio previsíveis.
+
+## Implemented state
+
+- `WebhookEndpoint` (`webhook_endpoints`): URL, tipos de evento assinados, status `ACTIVE`/`DISABLED` e a referência ao signing secret. API em `/api/v1/organizations/{organizationId}/webhook-endpoints`.
+- `CredentialReference` (`secrets`): valor cifrado por tenant, nunca devolvido depois da criação (ADR-0022).
+- Ainda não implementados: `Connection`, `Connector` e a entrega (integration worker).
