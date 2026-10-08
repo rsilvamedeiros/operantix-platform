@@ -13,6 +13,8 @@ import type { WorkerConfig } from './config';
 import { createDatabase } from './database';
 import { ExecutionRunner } from './execution/execution-runner';
 import { JobQueue } from './queue/job-queue';
+import { AiServiceClient } from './ai/ai-service-client';
+import { AiClassifyStep } from './steps/ai-classify-step';
 import { DelayStep } from './steps/delay-step';
 import { PostgresConnectionResolver } from './steps/connection-resolver';
 import { HttpRequestStep } from './steps/http-request-step';
@@ -83,6 +85,7 @@ export class WorkerModule {
                 config.http,
                 new PostgresConnectionResolver(db, new SecretCipher(config.secrets.keyring)),
               ),
+              new AiClassifyStep(config.ai ? new AiServiceClient(config.ai) : undefined),
             ]);
             const runner = new ExecutionRunner(db, dispatcher, config.retry);
             return new WorkerLoop(queue, runner, config.queue);

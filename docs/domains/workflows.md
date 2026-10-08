@@ -15,7 +15,7 @@ Definição, versionamento, activation e estrutura de automações.
 
 - `Workflow` pertence a um workspace; `key` é única no workspace.
 - `WorkflowVersion` é imutável e numerada a partir de 1; nova definição = nova versão.
-- `StepDefinition` segue o contrato `schemaVersion: 1` (trigger `manual`/`schedule`, steps lineares `http_request`/`delay`/`log`). Detalhes em `apps/platform-api/README.md`.
+- `StepDefinition` segue o contrato `schemaVersion: 1` (trigger `manual`/`schedule`, steps lineares `http_request`/`delay`/`ai_classify`/`log`). Detalhes em `apps/platform-api/README.md`.
 
 ## Invariants
 

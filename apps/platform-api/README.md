@@ -97,7 +97,7 @@ Definição (`src/workflows/workflow-definition.ts`, `schemaVersion: 1`):
 ```
 
 - `trigger`: `manual` ou `schedule` (`cron` com 5 campos).
-- `steps`: 1 a 50, executados em ordem; `id` minúsculo e único. Tipos: `http_request` (só `http`/`https`; a política de destino contra SSRF fica na execução), `delay` (1 s a 24 h), `log`.
+- `steps`: 1 a 50, executados em ordem; `id` minúsculo e único. Tipos: `http_request` (só `http`/`https`; a política de destino contra SSRF fica na execução), `delay` (1 s a 24 h), `ai_classify` (`inputField`: caminho com pontos no input da execução, até 10 níveis; `labels`: 2 a 50, `name` único de 1 a 64 caracteres `A-Za-z0-9_.:-` e `description` opcional de até 500), `log`.
 - Headers de credencial (`Authorization`, `Proxy-Authorization`, `Cookie`, `X-API-Key`, `X-Auth-Token`) são rejeitados: a definição fica em texto puro e qualquer papel lê. Referências a secrets entram com as integrações (M05).
 - Propriedades desconhecidas são rejeitadas, para erro de digitação não passar em silêncio.
 

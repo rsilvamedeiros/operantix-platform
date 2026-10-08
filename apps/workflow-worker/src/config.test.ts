@@ -95,4 +95,53 @@ describe('loadConfig', () => {
     expect(attempt).toThrow(/WORKER_DATABASE_PASSWORD/);
     expect(attempt).toThrow(/WORKER_BATCH_SIZE/);
   });
+
+  describe('AI service', () => {
+    // Built per run so no credential-like literal lives in the repo.
+    const token = randomBytes(32).toString('base64url');
+    const ai = { AI_SERVICE_URL: 'http://ai-service:8000', AI_SERVICE_TOKEN: token };
+
+    it('is off unless its URL is set', () => {
+      expect(loadConfig(required).ai).toBeUndefined();
+    });
+
+    it('reads the URL, token and timeout', () => {
+      expect(loadConfig({ ...required, ...ai }).ai).toEqual({
+        url: 'http://ai-service:8000',
+        token,
+        timeoutMs: 45_000,
+      });
+      expect(loadConfig({ ...required, ...ai, WORKER_AI_TIMEOUT_MS: '20000' }).ai?.timeoutMs).toBe(
+        20_000,
+      );
+    });
+
+    it('requires a token of at least 32 characters with the URL, without echoing it', () => {
+      expect(() => loadConfig({ ...required, AI_SERVICE_URL: ai.AI_SERVICE_URL })).toThrow(
+        /AI_SERVICE_TOKEN/,
+      );
+      const short = 'short-token-value';
+      const attempt = () => loadConfig({ ...required, ...ai, AI_SERVICE_TOKEN: short });
+
+      expect(attempt).toThrow(/AI_SERVICE_TOKEN/);
+      expect(attempt).not.toThrow(new RegExp(short));
+    });
+
+    it('only accepts http and https URLs', () => {
+      expect(() => loadConfig({ ...required, ...ai, AI_SERVICE_URL: 'ftp://ai' })).toThrow(
+        /AI_SERVICE_URL/,
+      );
+    });
+
+    it('requires the AI timeout to fit inside the job lease', () => {
+      expect(() =>
+        loadConfig({
+          ...required,
+          ...ai,
+          WORKER_LEASE_SECONDS: '30',
+          WORKER_AI_TIMEOUT_MS: '30000',
+        }),
+      ).toThrow(/WORKER_AI_TIMEOUT_MS/);
+    });
+  });
 });
