@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { type AnyEvent, createEvent, parseEvent } from '@operantix/contracts';
 import { startKafka, type TestKafka } from '@operantix/testing';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -14,8 +15,10 @@ const waitFor = async (condition: () => boolean, timeoutMs = 30_000): Promise<vo
   }
 };
 
-const header = (headers: Record<string, unknown> | undefined, name: string) =>
-  headers?.[name] === undefined ? undefined : String(headers[name]);
+const header = (headers: KafkaJS.IHeaders | undefined, name: string): string | undefined => {
+  const value = headers?.[name];
+  return value === undefined ? undefined : value.toString();
+};
 
 describe('Kafka event consumer', () => {
   let kafka: TestKafka;
@@ -226,6 +229,26 @@ describe('Kafka event consumer', () => {
       [slow.eventId, 1],
       [next.eventId, 1],
       [slow.eventId, 2],
+    ]);
+  });
+
+  it('leaves a waiting retry uncommitted when stopped, and runs it after a restart', async () => {
+    const names = await topics('restart');
+    const { deliveries, handler } = recorder(1);
+    const consumer = await consume(names, handler, { baseDelayMs: 2_000 });
+    const sent = event();
+
+    await send(names.source, JSON.stringify(sent));
+    await waitFor(() => deliveries.length === 1);
+    // Let the event reach the retry topic, then stop while its retry is still waiting.
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    await consumer.stop();
+
+    await consume(names, handler, { baseDelayMs: 2_000 });
+    await waitFor(() => deliveries.length === 2);
+    expect(deliveries.map((d) => [d.event.eventId, d.attempt])).toEqual([
+      [sent.eventId, 1],
+      [sent.eventId, 2],
     ]);
   });
 });
