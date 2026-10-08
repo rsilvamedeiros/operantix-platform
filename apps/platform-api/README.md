@@ -102,6 +102,8 @@ Workflows e versões têm RLS e chaves estrangeiras compostas com `organization_
 
 ## Execuções
 
+Steps têm os estados `PENDING`, `RUNNING`, `WAITING` (step `delay` aguardando, sem ocupar worker), `SUCCEEDED`, `FAILED` e `SKIPPED`.
+
 Iniciar uma execução congela a versão ativa (`workflowVersion`) e cria um `step_execution` `PENDING` por step, na ordem da definição. A execução nasce `PENDING`, e na mesma transação entra um job em `execution_jobs` para o worker; quem a move é o `workflow-worker`. Um replay idempotente não enfileira de novo. As transições válidas ficam em `src/executions/execution-state.ts`: `PENDING → RUNNING | CANCELLED` e `RUNNING → SUCCEEDED | FAILED | CANCELLED`; estados finais não mudam.
 
 Idempotência (`docs/api/idempotency.md`): com `Idempotency-Key`, a chave é única por workflow (índice único `(organization_id, workflow_id, idempotency_key)`) e guarda o SHA-256 do body canônico. Repetir a chave com o mesmo body devolve a primeira execução com `200`; com body diferente, `409 IDEMPOTENCY_KEY_REUSED`. Requisições concorrentes com a mesma chave usam `INSERT ... ON CONFLICT DO NOTHING`, então só uma cria a execução e as outras recebem a mesma.

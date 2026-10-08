@@ -12,7 +12,12 @@ interface Received {
   body: string;
 }
 
-const context = { organizationId: 'org-1', executionId: 'exec-1', input: {} };
+const context = {
+  organizationId: 'org-1',
+  executionId: 'exec-1',
+  input: {},
+  stepStartedAt: new Date(),
+};
 
 describe('HttpRequestStep', () => {
   let server: Server;

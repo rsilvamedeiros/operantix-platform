@@ -18,6 +18,7 @@ export const stepStatus = pgEnum('step_status', [
   'SUCCEEDED',
   'FAILED',
   'SKIPPED',
+  'WAITING',
 ]);
 
 export const executionJobs = pgTable('execution_jobs', {

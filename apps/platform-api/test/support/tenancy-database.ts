@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { Pool } from 'pg';
 import { runMigrations } from '../../src/database/migrations';
+import { endPool } from './end-pool';
 
 const APP_ROLE_SQL = resolve(__dirname, '../../../../infrastructure/docker/postgres/app-role.sql');
 
@@ -36,7 +37,7 @@ export async function startTenancyDatabase(): Promise<TenancyDatabase> {
       password,
     },
     stop: async () => {
-      await ownerPool.end();
+      await endPool(ownerPool);
       await container.stop();
     },
   };

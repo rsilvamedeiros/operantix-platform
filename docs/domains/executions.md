@@ -26,7 +26,8 @@ Lifecycle de uma execução e de cada step, tentativas, status, outputs e erros.
 - Fila `execution_jobs` em PostgreSQL (ADR-0018, ADR-0019): um job por execução, criado na mesma transação; o worker faz lease com `SKIP LOCKED` usando o papel `operantix_worker`.
 - `apps/workflow-worker` faz claim, roda os steps em ordem com resultado commitado por step (retomável após crash), marca a execução `SUCCEEDED`/`FAILED` e apaga o job; `max_attempts` limita claims de uma execução que nunca termina.
 - Step `http_request` com política de destino contra SSRF e `Idempotency-Key` estável por step; erros classificados em retentáveis (reagendados com backoff até `WORKER_STEP_MAX_ATTEMPTS`) e permanentes.
-- Ainda não implementado: step `delay` e timeline.
+- Step `delay` sem ocupar worker: o step fica `WAITING` e o job é reagendado para o fim da espera.
+- Ainda não implementado: timeline.
 
 ## Interfaces
 

@@ -11,6 +11,7 @@ import {
 import type { ClaimedJob } from '../queue/job-queue';
 import { type StepDispatcher, UnsupportedStepError } from '../steps/step-dispatcher';
 import { StepError } from '../steps/step-error';
+import { type StepContext, StepSuspended } from '../steps/step-handler';
 
 /** RESCHEDULED: a step failed with a retryable error and the job is due again later. */
 export type ExecutionOutcome = 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'RESCHEDULED';
@@ -115,17 +116,27 @@ export class ExecutionRunner {
           .select({ status: executions.status })
           .from(executions)
           .where(eq(executions.id, job.executionId));
-        if (!row || TERMINAL.has(row.status)) return { status: row?.status, attempt: 0 };
+        if (!row || TERMINAL.has(row.status)) {
+          return { status: row?.status, attempt: 0, startedAt: new Date() };
+        }
         const [started] = await tx
           .update(stepExecutions)
           .set({
             status: 'RUNNING',
-            attempts: sql`${stepExecutions.attempts} + 1`,
-            startedAt: sql`now()`,
+            // Waking a parked step continues the same attempt.
+            attempts:
+              step.status === 'WAITING'
+                ? stepExecutions.attempts
+                : sql`${stepExecutions.attempts} + 1`,
+            startedAt: sql`coalesce(${stepExecutions.startedAt}, now())`,
           })
           .where(eq(stepExecutions.id, step.id))
-          .returning({ attempts: stepExecutions.attempts });
-        return { status: row.status, attempt: started?.attempts ?? 1 };
+          .returning({ attempts: stepExecutions.attempts, startedAt: stepExecutions.startedAt });
+        return {
+          status: row.status,
+          attempt: started?.attempts ?? 1,
+          startedAt: started?.startedAt ?? new Date(),
+        };
       });
       if (current.status === undefined) return 'CANCELLED';
       if (TERMINAL.has(current.status)) return current.status as ExecutionOutcome;
@@ -134,7 +145,19 @@ export class ExecutionRunner {
       const result = await this.runStep(definition, step.stepId, {
         ...scope,
         input: execution.input,
+        stepStartedAt: current.startedAt,
       });
+
+      if ('suspendedUntil' in result) {
+        await tenant(async (tx) => {
+          await tx
+            .update(stepExecutions)
+            .set({ status: 'WAITING' })
+            .where(eq(stepExecutions.id, step.id));
+          await this.reschedule(tx, job.id, result.suspendedUntil);
+        });
+        return 'RESCHEDULED';
+      }
 
       if (
         'failure' in result &&
@@ -158,16 +181,7 @@ export class ExecutionRunner {
             .update(stepExecutions)
             .set({ status: 'PENDING', error: { ...result.failure } })
             .where(eq(stepExecutions.id, step.id));
-          // A scheduled retry is not a crash: the job's claim budget starts over.
-          await tx
-            .update(executionJobs)
-            .set({
-              runAfter: sql`now() + make_interval(secs => ${delayMs / 1000})`,
-              lockedUntil: null,
-              lockedBy: null,
-              attempts: 0,
-            })
-            .where(eq(executionJobs.id, job.id));
+          await this.reschedule(tx, job.id, new Date(Date.now() + delayMs));
         });
         return 'RESCHEDULED';
       }
@@ -206,11 +220,20 @@ export class ExecutionRunner {
     return 'SUCCEEDED';
   }
 
+  /** Releases the lease and makes the job due at `runAfter`. */
+  private async reschedule(tx: Transaction, jobId: string, runAfter: Date): Promise<void> {
+    // A planned wake-up is not a crash: the job's claim budget starts over.
+    await tx
+      .update(executionJobs)
+      .set({ runAfter, lockedUntil: null, lockedBy: null, attempts: 0 })
+      .where(eq(executionJobs.id, jobId));
+  }
+
   private async runStep(
     definition: WorkflowStep | undefined,
     stepId: string,
-    context: { organizationId: string; executionId: string; input: Record<string, unknown> },
-  ): Promise<{ output: unknown } | { failure: StepFailure }> {
+    context: StepContext,
+  ): Promise<{ output: unknown } | { failure: StepFailure } | { suspendedUntil: Date }> {
     if (!definition) {
       return {
         failure: {
@@ -223,6 +246,7 @@ export class ExecutionRunner {
     try {
       return { output: (await this.dispatcher.dispatch(definition, context)) ?? null };
     } catch (error) {
+      if (error instanceof StepSuspended) return { suspendedUntil: error.resumeAt };
       if (error instanceof StepError) {
         return {
           failure: { code: error.code, message: error.message, retryable: error.retryable },

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { endPool } from './support/end-pool';
 import { startTenancyDatabase, type TenancyDatabase } from './support/tenancy-database';
 
 /**
@@ -69,7 +70,7 @@ describe('worker database role', () => {
   });
 
   afterAll(async () => {
-    await worker.end();
+    await endPool(worker);
     await database.stop();
   });
 
