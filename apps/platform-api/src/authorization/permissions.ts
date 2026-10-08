@@ -7,7 +7,9 @@ export type Permission =
   | 'workflow:write'
   | 'workflow:activate'
   | 'execution:read'
-  | 'execution:start';
+  | 'execution:start'
+  | 'integration:read'
+  | 'integration:write';
 
 const READ: Permission[] = ['workspace:read', 'workflow:read', 'execution:read'];
 
@@ -19,6 +21,8 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'workflow:write',
     'workflow:activate',
     'execution:start',
+    'integration:read',
+    'integration:write',
   ]),
   ADMIN: new Set([
     ...READ,
@@ -26,10 +30,21 @@ const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
     'workflow:write',
     'workflow:activate',
     'execution:start',
+    'integration:read',
+    'integration:write',
   ]),
-  DEVELOPER: new Set([...READ, 'workflow:write', 'workflow:activate', 'execution:start']),
+  DEVELOPER: new Set([
+    ...READ,
+    'workflow:write',
+    'workflow:activate',
+    'execution:start',
+    'integration:read',
+    'integration:write',
+  ]),
   // Operators run what developers built: they can switch versions and start runs, not edit.
-  OPERATOR: new Set([...READ, 'workflow:activate', 'execution:start']),
+  // They see where events go, but cannot redirect them.
+  OPERATOR: new Set([...READ, 'workflow:activate', 'execution:start', 'integration:read']),
+  // Viewers do not see integrations: endpoint URLs can embed tokens.
   VIEWER: new Set(READ),
 };
 

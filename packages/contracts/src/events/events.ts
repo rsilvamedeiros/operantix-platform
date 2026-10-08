@@ -19,6 +19,9 @@ const CURRENT_VERSION = {
 
 export type EventType = keyof typeof CURRENT_VERSION;
 
+/** Every event type, for consumers that let users choose among them (webhook subscriptions). */
+export const EVENT_TYPES = Object.keys(CURRENT_VERSION) as [EventType, ...EventType[]];
+
 type CurrentKey<T extends EventType> = `${T}@${(typeof CURRENT_VERSION)[T]}` & DefinitionKey;
 
 export type EventData<T extends EventType> = z.output<(typeof EVENT_DEFINITIONS)[CurrentKey<T>]>;

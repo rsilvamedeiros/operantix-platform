@@ -7,6 +7,7 @@ import { createApp } from '../src/app';
 import type { AppConfig } from '../src/config/config';
 import { buildOpenApiDocument, documentedResponse } from '../src/openapi/openapi.document';
 import { AUDIENCE, ISSUER, type JwksIssuer, startJwksIssuer } from './support/jwks-issuer';
+import { testKeyring } from './support/secrets';
 import { startTenancyDatabase, type TenancyDatabase } from './support/tenancy-database';
 
 const httpServer = (app: INestApplication): Server => app.getHttpServer() as Server;
@@ -32,6 +33,7 @@ describe('API responses match the OpenAPI contract', () => {
       redis: { host: '127.0.0.1', port: CLOSED_PORT },
       health: { checkTimeoutMs: 100 },
       auth: { issuer: ISSUER, audience: AUDIENCE, jwksUri: issuer.jwksUri },
+      secrets: { keyring: testKeyring() },
     };
     app = await createApp(config, { logger: false });
     await app.init();
@@ -137,5 +139,18 @@ describe('API responses match the OpenAPI contract', () => {
     );
     const waiting = await call('get', `${base}/executions/{executionId}`, { ...ids, executionId });
     expect((waiting.body as { steps: { status: string }[] }).steps[0]?.status).toBe('WAITING');
+
+    const endpoint = await call('post', `${base}/webhook-endpoints`, ids, {
+      url: 'https://hooks.example.test/contract',
+      eventTypes: ['execution.completed'],
+    });
+    const endpointId = (endpoint.body as { id: string }).id;
+    const endpointIds = { ...ids, endpointId };
+    await call('post', `${base}/webhook-endpoints`, ids, { url: 'nope', eventTypes: [] }); // 400
+    await call('get', `${base}/webhook-endpoints`, ids);
+    await call('get', `${base}/webhook-endpoints/{endpointId}`, endpointIds);
+    await call('post', `${base}/webhook-endpoints/{endpointId}/rotate-secret`, endpointIds);
+    await call('delete', `${base}/webhook-endpoints/{endpointId}`, endpointIds);
+    await call('get', `${base}/webhook-endpoints/{endpointId}`, endpointIds); // 404
   });
 });

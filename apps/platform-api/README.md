@@ -73,6 +73,8 @@ O `AuthorizationGuard` global roda depois do `AuthGuard`. Em rotas com `:organiz
 | `workflow:activate` | ✓ | ✓ | ✓ | ✓ | |
 | `execution:read` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `execution:start` | ✓ | ✓ | ✓ | ✓ | |
+| `integration:read` | ✓ | ✓ | ✓ | ✓ | |
+| `integration:write` | ✓ | ✓ | ✓ | | |
 
 A matriz fica em `src/authorization/permissions.ts`.
 
@@ -113,6 +115,12 @@ Timeline: `execution_events` é append-only (trigger rejeita `UPDATE`/`DELETE` d
 
 A listagem usa keyset pagination em `(created_at desc, id desc)`. O cursor é opaco; um cursor inválido devolve `400`.
 
+## Webhook endpoints
+
+Uma organização registra para onde seus eventos de execução vão (`POST /api/v1/organizations/{organizationId}/webhook-endpoints`): `url` (`http`/`https`, sem credenciais na URL), `eventTypes` (um ou mais tipos de `@operantix/contracts`, sem repetição) e `description` opcional. A resposta traz `signingSecret` (`whsec_...`) uma única vez; listar e ler nunca o devolvem. `POST .../{endpointId}/rotate-secret` troca o secret na hora e devolve o novo; `DELETE` apaga o endpoint e o secret. Criar, rotacionar e apagar são auditados, sem o secret.
+
+O secret fica em `secrets`, cifrado com AES-256-GCM pelo keyring de `SECRETS_ENCRYPTION_KEYS` e preso ao tenant e à linha (ADR-0022). A API só cifra. Viewers não veem endpoints, porque URLs podem carregar tokens; operators leem, mas não alteram. A entrega dos eventos é do integration worker.
+
 ## Auditoria
 
 `recordAudit(tx, tenant, event)` grava em `audit_entries` na mesma transação da mudança, então a entrada existe se e somente se a mudança foi commitada. A tabela tem RLS por tenant e um trigger que rejeita `UPDATE` e `DELETE` (append-only). Ações seguem `<recurso>.<verbo no passado>`, ex.: `workspace.created`.
@@ -132,6 +140,7 @@ Validada na inicialização (`src/config/config.ts`); variável ausente ou invá
 | `HEALTH_CHECK_TIMEOUT_MS` | `2000` |
 | `AUTH_ISSUER`, `AUTH_JWKS_URI` | obrigatórias (URLs) |
 | `AUTH_AUDIENCE` | obrigatória |
+| `SECRETS_ENCRYPTION_KEYS` | obrigatória; `id:base64` (32 bytes), separadas por vírgula, a ativa primeiro (ADR-0022) |
 
 `db:migrate` usa só `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_MIGRATION_USER` e `DATABASE_MIGRATION_PASSWORD`.
 

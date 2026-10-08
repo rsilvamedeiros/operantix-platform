@@ -38,6 +38,12 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.2.7
         version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7)
+      '@operantix/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@operantix/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
       drizzle-orm:
         specifier: ^0.45.3
         version: 0.45.3(@types/pg@8.23.1)(pg@8.23.1)
@@ -183,6 +189,18 @@ importers:
       '@operantix/testing':
         specifier: workspace:*
         version: link:../testing
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      '@vitest/coverage-v8':
+        specifier: ^5.0.3
+        version: 5.0.3(vitest@5.0.3)
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/coverage-v8@5.0.3)(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/secrets:
+    devDependencies:
       '@types/node':
         specifier: ^22.20.5
         version: 22.20.5

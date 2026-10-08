@@ -6,3 +6,5 @@ export * from '../audit/audit.schema';
 export * from '../workflows/workflows.schema';
 export * from '../executions/executions.schema';
 export * from '../eventing/outbox.schema';
+export * from '../integrations/secrets.schema';
+export * from '../integrations/webhook-endpoints.schema';

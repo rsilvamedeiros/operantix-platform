@@ -11,6 +11,7 @@ import { createDatabase } from '../src/database/database';
 import { memberships, users } from '../src/identity/identity.schema';
 import { organizations, workspaces } from '../src/organizations/organizations.schema';
 import { AUDIENCE, ISSUER, type JwksIssuer, startJwksIssuer } from './support/jwks-issuer';
+import { testKeyring } from './support/secrets';
 import { startTenancyDatabase, type TenancyDatabase } from './support/tenancy-database';
 
 const httpServer = (app: INestApplication): Server => app.getHttpServer() as Server;
@@ -60,6 +61,7 @@ describe('workspaces API with tenant context, RBAC and audit', () => {
       redis: { host: '127.0.0.1', port: CLOSED_PORT },
       health: { checkTimeoutMs: 100 },
       auth: { issuer: ISSUER, audience: AUDIENCE, jwksUri: issuer.jwksUri },
+      secrets: { keyring: testKeyring() },
     };
     app = await createApp(config, { logger: false });
     await app.init();

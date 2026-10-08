@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createEvent,
   EVENT_DEFINITIONS,
+  EVENT_TYPES,
   EventContractError,
   type EventMetadata,
   parseEvent,
@@ -186,5 +187,18 @@ describe('execution events', () => {
         meta,
       ),
     ).toThrow(EventContractError);
+  });
+});
+
+describe('EVENT_TYPES', () => {
+  it('lists each event type once, without versions', () => {
+    expect(EVENT_TYPES).toEqual([
+      'execution.started',
+      'execution.step.started',
+      'execution.step.completed',
+      'execution.step.failed',
+      'execution.completed',
+      'execution.failed',
+    ]);
   });
 });

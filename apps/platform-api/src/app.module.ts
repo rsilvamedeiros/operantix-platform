@@ -6,6 +6,7 @@ import {
   type OnApplicationShutdown,
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { SecretCipher } from '@operantix/secrets';
 import { createRemoteJWKSet } from 'jose';
 import type { Pool } from 'pg';
 import { JwtAccessTokenVerifier } from './auth/access-token-verifier';
@@ -17,6 +18,9 @@ import { createDatabase, type Database } from './database/database';
 import { DATABASE } from './database/database.tokens';
 import { ExecutionsController } from './executions/executions.controller';
 import { ExecutionsService } from './executions/executions.service';
+import { SECRET_CIPHER, SecretStore } from './integrations/secret-store';
+import { WebhookEndpointsController } from './integrations/webhook-endpoints.controller';
+import { WebhookEndpointsService } from './integrations/webhook-endpoints.service';
 import { HealthController } from './health/health.controller';
 import { HEALTH_OPTIONS, READINESS_CHECKS } from './health/health.tokens';
 import { createPostgresPool, postgresReadinessCheck } from './infrastructure/postgres';
@@ -56,6 +60,7 @@ export const CONTROLLERS = [
   WorkspacesController,
   WorkflowsController,
   ExecutionsController,
+  WebhookEndpointsController,
   OpenApiController,
 ];
 
@@ -103,6 +108,9 @@ export class AppModule {
         WorkspacesService,
         ExecutionsService,
         WorkflowsService,
+        { provide: SECRET_CIPHER, useValue: new SecretCipher(config.secrets.keyring) },
+        SecretStore,
+        WebhookEndpointsService,
         ConnectionsLifecycle,
       ],
     };

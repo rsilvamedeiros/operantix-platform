@@ -134,6 +134,20 @@
       "when": 1791470136206,
       "tag": "0018_outbox_relay_role",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791471476126,
+      "tag": "0019_webhook_endpoints",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791471487036,
+      "tag": "0020_webhook_endpoints_rls",
+      "breakpoints": true
     }
   ]
 }
