@@ -29,3 +29,8 @@ Implementado em `packages/contracts` (`src/events/envelope.ts`).
 - não incluir secret.
 - PII somente quando necessário e documentado.
 - Erros de contrato nomeiam campos, nunca valores.
+
+## Trace id (M07)
+
+`traceId` is the execution's id without dashes, and the relay publishes it as the W3C
+`traceparent` header (with the producer span's id). See ADR-0030.
