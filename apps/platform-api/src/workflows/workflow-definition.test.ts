@@ -147,4 +147,50 @@ describe('workflowDefinitionSchema', () => {
       'trigger',
     ]);
   });
+
+  describe('ai_classify steps', () => {
+    const classify = (config: Record<string, unknown>) => ({
+      ...valid,
+      steps: [{ id: 'triage', name: 'Triage', type: 'ai_classify', config }],
+    });
+    const config = {
+      inputField: 'ticket.body',
+      labels: [{ name: 'billing', description: 'Charges and refunds' }, { name: 'outage' }],
+    };
+
+    it('accepts a field of the execution input and two or more labels', () => {
+      expect(issuesOf(classify(config))).toEqual([]);
+    });
+
+    it.each(['', 'ticket..body', '1st', 'ticket.body[0]', 'a.b.c.d.e.f.g.h.i.j.k'])(
+      'rejects the input field %j',
+      (inputField) => {
+        expect(issuesOf(classify({ ...config, inputField }))).toEqual([
+          'steps.0.config.inputField',
+        ]);
+      },
+    );
+
+    it.each([
+      ['a single label', [{ name: 'billing' }]],
+      ['more than 50 labels', Array.from({ length: 51 }, (_, i) => ({ name: `l${String(i)}` }))],
+      ['duplicate names', [{ name: 'billing' }, { name: 'billing' }]],
+    ])('rejects %s', (_, labels) => {
+      expect(issuesOf(classify({ ...config, labels }))).toEqual(['steps.0.config.labels']);
+    });
+
+    it('rejects label names the AI service would refuse', () => {
+      const labels = [{ name: 'has space' }, { name: 'ok' }];
+
+      expect(issuesOf(classify({ ...config, labels }))).toEqual(['steps.0.config.labels.0.name']);
+    });
+
+    it('rejects long label descriptions', () => {
+      const labels = [{ name: 'a', description: 'd'.repeat(501) }, { name: 'b' }];
+
+      expect(issuesOf(classify({ ...config, labels }))).toEqual([
+        'steps.0.config.labels.0.description',
+      ]);
+    });
+  });
 });
