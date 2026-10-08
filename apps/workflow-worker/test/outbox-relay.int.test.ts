@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { createEvent, parseEvent } from '@operantix/contracts';
+import { KafkaEventPublisher } from '@operantix/messaging';
+import { startKafka, type TestKafka } from '@operantix/testing';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database';
 import { ExecutionRunner } from '../src/execution/execution-runner';
-import { KafkaEventPublisher } from '../src/messaging/kafka-publisher';
 import { OutboxRelay } from '../src/outbox/outbox-relay';
 import { JobQueue } from '../src/queue/job-queue';
 import { LogStep } from '../src/steps/log-step';
 import { StepDispatcher } from '../src/steps/step-dispatcher';
 import { WorkerLoop } from '../src/worker-loop';
 import { type EngineDatabase, startEngineDatabase } from './support/engine-database';
-import { startKafka, type TestKafka } from './support/kafka';
 
 describe('outbox relay', () => {
   let database: EngineDatabase;

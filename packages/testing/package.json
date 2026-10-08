@@ -1,0 +1,24 @@
+{
+  "name": "@operantix/testing",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Test infrastructure shared by Operantix workloads",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@confluentinc/kafka-javascript": "^1.11.0",
+    "testcontainers": "^12.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5"
+  }
+}

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { parseEvent } from '@operantix/contracts';
+import type { EventPublisher, OutgoingMessage } from '@operantix/messaging';
 import type { Pool, PoolClient } from 'pg';
-import type { EventPublisher, OutgoingMessage } from '../messaging/event-publisher';
 
 export interface OutboxRelayOptions {
   batchSize: number;

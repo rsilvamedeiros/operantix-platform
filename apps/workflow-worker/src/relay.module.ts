@@ -7,8 +7,8 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
+import { KafkaEventPublisher } from '@operantix/messaging';
 import { Pool } from 'pg';
-import { KafkaEventPublisher } from './messaging/kafka-publisher';
 import { OutboxRelay } from './outbox/outbox-relay';
 import { PollingLoop } from './polling-loop';
 import type { RelayConfig } from './relay-config';
