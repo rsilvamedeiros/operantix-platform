@@ -8,6 +8,7 @@ export {
   type AnyEvent,
   createEvent,
   EVENT_DEFINITIONS,
+  EVENT_TYPES,
   type EventData,
   type EventEnvelope,
   type EventType,
