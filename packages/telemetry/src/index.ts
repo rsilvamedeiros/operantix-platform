@@ -24,3 +24,5 @@ export {
   traced,
 } from './spans';
 export type { SpanOptions } from './spans';
+export { meter, startMetrics, startTelemetryFromEnv } from './metrics';
+export type { MetricsConfig, MetricsHandle, StartMetricsOptions, TelemetryHandle } from './metrics';

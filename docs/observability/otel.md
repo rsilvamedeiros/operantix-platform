@@ -18,6 +18,6 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318
 # run an app; open Grafana at http://127.0.0.1:3001 -> Explore -> Tempo
 ```
 
-Log lines written inside a span carry `traceId` and `spanId`, so a trace id from Grafana can be
+Metrics use the same variables and endpoint (see `metrics.md`, ADR-0031). Log lines written inside a span carry `traceId` and `spanId`, so a trace id from Grafana can be
 searched in the logs. `/health/*` requests are not traced. Propagation through Kafka and the
 `ai-service` are not instrumented yet.

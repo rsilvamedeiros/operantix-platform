@@ -1,6 +1,11 @@
 import { parseEvent } from '@operantix/contracts';
-import { startTracing } from '@operantix/telemetry';
+import { startMetrics, startTracing } from '@operantix/telemetry';
 import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import {
+  AggregationTemporality,
+  InMemoryMetricExporter,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database';
@@ -221,6 +226,74 @@ describe('workflow worker against PostgreSQL', () => {
       expect(spans.find((span) => span.name === 'step delay')?.status.code).toBe(
         SpanStatusCode.UNSET,
       );
+    });
+  });
+
+  describe('metrics', () => {
+    const measured = async (run: () => Promise<void>) => {
+      const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+      const handle = startMetrics(
+        { serviceName: 'worker-test', environment: 'test', endpoint: 'http://unused:4318' },
+        {
+          metricReader: new PeriodicExportingMetricReader({
+            exporter,
+            exportIntervalMillis: 60_000,
+          }),
+        },
+      );
+      try {
+        await run();
+        await handle.forceFlush();
+        const all = exporter
+          .getMetrics()
+          .flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics));
+        return (name: string) =>
+          all
+            .find((metric) => metric.descriptor.name === name)
+            ?.dataPoints.map((point) => ({
+              attributes: point.attributes,
+              value: point.value,
+            })) ?? [];
+      } finally {
+        await handle.shutdown();
+      }
+    };
+
+    it('counts finished runs by outcome and times steps by type and outcome', async () => {
+      await database.seedExecution([log('first'), log('second')]);
+      await database.seedExecution([{ id: 'call', name: 'Call', type: 'boom', config: {} }]);
+
+      const read = await measured(async () => {
+        await loop.tick();
+      });
+
+      const runs = read('operantix.execution.runs');
+      expect(runs).toEqual(
+        expect.arrayContaining([
+          { attributes: { outcome: 'SUCCEEDED' }, value: 1 },
+          { attributes: { outcome: 'FAILED' }, value: 1 },
+        ]),
+      );
+      const steps = read('operantix.step.duration') as { attributes: Record<string, string> }[];
+      expect(steps.map((point) => point.attributes)).toEqual(
+        expect.arrayContaining([
+          { 'step.type': 'log', outcome: 'success' },
+          { 'step.type': 'boom', outcome: 'failure' },
+        ]),
+      );
+    });
+
+    it('never uses an id or a message as an attribute', async () => {
+      await database.seedExecution([{ id: 'call', name: 'Call', type: 'boom', config: {} }]);
+      const read = await measured(async () => {
+        await loop.tick();
+      });
+      const attributes = JSON.stringify([
+        ...read('operantix.execution.runs'),
+        ...read('operantix.step.duration'),
+      ]);
+      expect(attributes).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}/);
+      expect(attributes).not.toContain('remote said no');
     });
   });
 

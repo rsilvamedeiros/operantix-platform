@@ -1,6 +1,6 @@
 import { type AnyEvent, parseEvent } from '@operantix/contracts';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
-import { extractTraceContext, traced } from '@operantix/telemetry';
+import { extractTraceContext, meter, traced } from '@operantix/telemetry';
 import { SpanKind } from '@opentelemetry/api';
 import type { EventPublisher } from './event-publisher';
 import {
@@ -121,6 +121,7 @@ export class KafkaEventConsumer {
       return;
     }
 
+    const started = performance.now();
     try {
       // The producer's span (from `traceparent`) is the parent; retries keep the header, so every
       // attempt lands in the same trace.
@@ -139,7 +140,9 @@ export class KafkaEventConsumer {
         },
         () => this.handler({ event, attempt, topic: source.topic }),
       );
+      recordDelivery(source.topic, 'success', started);
     } catch (error) {
+      recordDelivery(source.topic, 'error', started);
       const route = routeFailure(error, attempt, this.options.retry, new Date());
       if (route.kind === 'dead-letter') {
         await this.deadLetter(message, headers, source, attempt, route.reason, error);
@@ -203,4 +206,20 @@ export class KafkaEventConsumer {
       });
     });
   }
+}
+
+/** One delivery attempt ended. The topic is configuration, so the label stays bounded. */
+function recordDelivery(topic: string, outcome: 'success' | 'error', startedAt: number): void {
+  const attributes = { topic, outcome };
+  meter()
+    .createCounter('operantix.consumer.deliveries', {
+      description: 'Delivery attempts handled by event consumers, by topic and outcome',
+    })
+    .add(1, attributes);
+  meter()
+    .createHistogram('operantix.consumer.duration', {
+      description: 'Time spent in the handler for one delivery attempt',
+      unit: 'ms',
+    })
+    .record(performance.now() - startedAt, attributes);
 }

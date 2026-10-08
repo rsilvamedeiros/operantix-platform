@@ -3,8 +3,13 @@ import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { type AnyEvent, createEvent, parseEvent } from '@operantix/contracts';
 import { startKafka, type TestKafka } from '@operantix/testing';
 import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import {
+  AggregationTemporality,
+  InMemoryMetricExporter,
+  PeriodicExportingMetricReader,
+} from '@opentelemetry/sdk-metrics';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
-import { startTracing } from '@operantix/telemetry';
+import { startMetrics, startTracing } from '@operantix/telemetry';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type EventDelivery, type EventHandler, KafkaEventConsumer } from '../src/kafka-consumer';
 import { KafkaEventPublisher } from '../src/kafka-publisher';
@@ -307,6 +312,43 @@ describe('Kafka event consumer', () => {
       expect(span?.status.code).toBe(SpanStatusCode.ERROR);
     } finally {
       await tracing.shutdown();
+    }
+  });
+
+  it('counts deliveries by topic and outcome and times each one', async () => {
+    const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    const metrics = startMetrics(
+      { serviceName: 'consumer-test', environment: 'test', endpoint: 'http://unused:4318' },
+      {
+        metricReader: new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 }),
+      },
+    );
+    try {
+      const names = await topics('metrics');
+      const { deliveries, handler } = recorder(1);
+      await consume(names, handler, { maxAttempts: 3, baseDelayMs: 100 });
+
+      await send(names.source, JSON.stringify(event()));
+      await waitFor(() => deliveries.length === 2);
+      await metrics.forceFlush();
+
+      const all = exporter
+        .getMetrics()
+        .flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics));
+      const counted = all
+        .find((metric) => metric.descriptor.name === 'operantix.consumer.deliveries')
+        ?.dataPoints.map((point) => ({ attributes: point.attributes, value: point.value }));
+      expect(counted).toEqual(
+        expect.arrayContaining([
+          { attributes: { topic: names.source, outcome: 'error' }, value: 1 },
+          { attributes: { topic: names.source, outcome: 'success' }, value: 1 },
+        ]),
+      );
+      const timed = all.find((metric) => metric.descriptor.name === 'operantix.consumer.duration');
+      expect(timed?.descriptor.unit).toBe('ms');
+      expect(timed?.dataPoints.length).toBeGreaterThan(0);
+    } finally {
+      await metrics.shutdown();
     }
   });
 });
