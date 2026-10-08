@@ -2,6 +2,7 @@ import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
 import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
+  endSpan,
   extractTraceContext,
   injectTraceContext,
   startSpan,
@@ -89,5 +90,27 @@ describe('spans', () => {
     expect(span.spanContext().traceId).toBe(TRACE_ID);
     span.end();
     expect(exporter.getFinishedSpans()).toHaveLength(1);
+  });
+
+  it('injects the context of a given span, not the active one', () => {
+    const span = startSpan('producer', {
+      kind: SpanKind.PRODUCER,
+      parent: traceContextFor(TRACE_ID),
+    });
+    const carrier: Record<string, string> = {};
+    injectTraceContext(carrier, span);
+    expect(carrier.traceparent).toBe(`00-${TRACE_ID}-${span.spanContext().spanId}-01`);
+    span.end();
+  });
+
+  it('endSpan ends the span, marking it failed when given an error', () => {
+    const ok = startSpan('ok');
+    endSpan(ok);
+    const failed = startSpan('failed');
+    endSpan(failed, new Error('boom'));
+    const [first, second] = exporter.getFinishedSpans();
+    expect(first?.status.code).toBe(SpanStatusCode.UNSET);
+    expect(second?.status.code).toBe(SpanStatusCode.ERROR);
+    expect(second?.events.map((e) => e.name)).toContain('exception');
   });
 });
