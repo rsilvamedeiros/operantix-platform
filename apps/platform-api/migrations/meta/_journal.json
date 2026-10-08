@@ -113,6 +113,20 @@
       "when": 1791415301631,
       "tag": "0015_execution_events_append_only",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1791469049229,
+      "tag": "0016_outbox_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1791469050086,
+      "tag": "0017_outbox_events_rls",
+      "breakpoints": true
     }
   ]
 }

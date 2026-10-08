@@ -5,3 +5,4 @@ export * from '../organizations/organizations.schema';
 export * from '../audit/audit.schema';
 export * from '../workflows/workflows.schema';
 export * from '../executions/executions.schema';
+export * from '../eventing/outbox.schema';
