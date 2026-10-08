@@ -176,7 +176,9 @@ describe('workflow worker against PostgreSQL', () => {
     it('puts a run and its steps in the execution trace', async () => {
       const seeded = await database.seedExecution([log('first'), log('second')]);
 
-      const spans = await traced(() => loop.tick());
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
 
       const traceId = seeded.executionId.replaceAll('-', '');
       expect(spans.map((span) => span.spanContext().traceId)).toEqual(Array(3).fill(traceId));
@@ -196,7 +198,9 @@ describe('workflow worker against PostgreSQL', () => {
         { id: 'call', name: 'Call', type: 'boom', config: {} },
       ]);
 
-      const spans = await traced(() => loop.tick());
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
 
       const step = spans.find((span) => span.name === 'step boom');
       expect(step?.status.code).toBe(SpanStatusCode.ERROR);
@@ -210,7 +214,9 @@ describe('workflow worker against PostgreSQL', () => {
         { id: 'wait', name: 'Wait', type: 'delay', config: { seconds: 3600 } },
       ]);
 
-      const spans = await traced(() => loop.tick());
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
 
       expect(spans.find((span) => span.name === 'step delay')?.status.code).toBe(
         SpanStatusCode.UNSET,
