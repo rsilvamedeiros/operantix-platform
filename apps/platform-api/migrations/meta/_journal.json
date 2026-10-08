@@ -148,6 +148,20 @@
       "when": 1791471487036,
       "tag": "0020_webhook_endpoints_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791472307918,
+      "tag": "0021_webhook_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791472308795,
+      "tag": "0022_integration_role",
+      "breakpoints": true
     }
   ]
 }

@@ -15,6 +15,7 @@ services:
       - ./infrastructure/docker/postgres/app-role.sql:/operantix/app-role.sql:ro
       - ./infrastructure/docker/postgres/worker-role.sql:/operantix/worker-role.sql:ro
       - ./infrastructure/docker/postgres/relay-role.sql:/operantix/relay-role.sql:ro
+      - ./infrastructure/docker/postgres/integration-role.sql:/operantix/integration-role.sql:ro
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U operantix -d operantix']
       interval: 5s
