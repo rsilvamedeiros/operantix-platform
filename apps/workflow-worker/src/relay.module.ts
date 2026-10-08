@@ -7,10 +7,9 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
-import { KafkaEventPublisher } from '@operantix/messaging';
+import { KafkaEventPublisher, PollingLoop } from '@operantix/messaging';
 import { Pool } from 'pg';
 import { OutboxRelay } from './outbox/outbox-relay';
-import { PollingLoop } from './polling-loop';
 import type { RelayConfig } from './relay-config';
 
 const POOL = Symbol('POOL');
@@ -83,8 +82,8 @@ export class RelayModule {
           inject: [OutboxRelay],
           useFactory: (relay: OutboxRelay) => {
             let lastCleanup = 0;
+            const logger = new Logger(OutboxRelay.name);
             return new PollingLoop(
-              OutboxRelay.name,
               async () => {
                 // The publisher connects on its first publish, so a broker that is down
                 // fails a tick (logged and retried) instead of the startup.
@@ -96,6 +95,11 @@ export class RelayModule {
                 return published;
               },
               config.relay,
+              (error) => {
+                logger.error({
+                  msg: `Tick failed: ${error instanceof Error ? error.message : String(error)}`,
+                });
+              },
             );
           },
         },

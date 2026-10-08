@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
+import { PollingLoop, type PollingLoopOptions } from '@operantix/messaging';
 import type { ExecutionOutcome } from './execution/execution-runner';
-import { PollingLoop, type PollingLoopOptions } from './polling-loop';
 import type { ClaimedJob } from './queue/job-queue';
 
 export interface JobSource {
@@ -31,7 +31,13 @@ export class WorkerLoop {
     private readonly runner: JobRunner,
     private readonly options: WorkerLoopOptions,
   ) {
-    this.polling = new PollingLoop(WorkerLoop.name, () => this.tick(), options);
+    this.polling = new PollingLoop(
+      () => this.tick(),
+      options,
+      (error) => {
+        this.logger.error({ msg: `Tick failed: ${message(error)}` });
+      },
+    );
   }
 
   /** Claims one batch and runs it; returns how many jobs were claimed. */

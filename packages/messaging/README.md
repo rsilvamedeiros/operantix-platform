@@ -3,6 +3,7 @@
 Adapters Kafka compartilhados entre workloads (ADR-0020). O código de aplicação depende das abstrações (`EventPublisher`), não do cliente.
 
 - `KafkaEventPublisher`: producer idempotente com `acks=all`; conecta no primeiro uso.
+- `PollingLoop`: repete um tick até parar, dormindo quando o lote vem incompleto; erro de tick vai para `onError` e o loop segue. Usado pelas filas no PostgreSQL dos workers.
 - `KafkaEventConsumer`: consome eventos de contrato com retry topic e DLQ (`docs/events/retry-dlq.md`). O handler recebe `{event, attempt, topic}` e precisa ser idempotente (`docs/events/idempotency.md`); `PermanentError(code)` manda o evento direto para a DLQ.
 
 ```ts
