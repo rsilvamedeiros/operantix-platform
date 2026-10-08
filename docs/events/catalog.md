@@ -1,6 +1,21 @@
 # Event Catalog
 
-## Initial candidates
+## Implemented contracts
+
+Definidos em `packages/contracts/src/events/execution-events.ts`, com JSON Schema em `packages/contracts/schemas/events/`. Todos usam `executionId` como partition key.
+
+| Evento | Versão | `data` | Valor |
+| --- | --- | --- | --- |
+| `execution.started` | 1 | `executionId`, `workflowId`, `workflowVersion` | stream do ciclo de vida |
+| `execution.step.started` | 1 | `executionId`, `stepId`, `attempt` | progresso por step |
+| `execution.step.completed` | 1 | `executionId`, `stepId`, `attempt` | progresso por step |
+| `execution.step.failed` | 1 | `executionId`, `stepId`, `attempt`, `errorCode`, `retryable` | alertas e métricas de falha |
+| `execution.completed` | 1 | `executionId`, `workflowId` | notificação de término (integrações, M05) |
+| `execution.failed` | 1 | `executionId`, `errorCode` | notificação de falha (integrações, M05) |
+
+Mensagens de erro ficam fora dos eventos: podem citar destinos HTTP. O producer (workflow worker, via outbox) e o topic entram nas próximas entregas do M04.
+
+## Candidates
 
 ### Workflow
 - `workflow.created`
