@@ -27,6 +27,70 @@ importers:
         specifier: ^8.71.1
         version: 8.71.1(eslint@9.39.5)(typescript@6.0.3)
 
+  apps/integration-worker:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.2.7
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core':
+        specifier: ^11.2.7
+        version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.7)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@operantix/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@operantix/http-client':
+        specifier: workspace:*
+        version: link:../../packages/http-client
+      '@operantix/messaging':
+        specifier: workspace:*
+        version: link:../../packages/messaging
+      '@operantix/secrets':
+        specifier: workspace:*
+        version: link:../../packages/secrets
+      drizzle-orm:
+        specifier: ^0.45.3
+        version: 0.45.3(@types/pg@8.23.1)(pg@8.23.1)
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
+      reflect-metadata:
+        specifier: ^0.2.2
+        version: 0.2.2
+      rxjs:
+        specifier: ^7.8.2
+        version: 7.8.2
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@operantix/testing':
+        specifier: workspace:*
+        version: link:../../packages/testing
+      '@swc/core':
+        specifier: ^1.16.13
+        version: 1.16.13
+      '@testcontainers/postgresql':
+        specifier: ^12.2.0
+        version: 12.2.0
+      '@types/node':
+        specifier: ^22.20.5
+        version: 22.20.5
+      '@types/pg':
+        specifier: ^8.23.1
+        version: 8.23.1
+      '@vitest/coverage-v8':
+        specifier: ^5.0.3
+        version: 5.0.3(vitest@5.0.3)
+      testcontainers:
+        specifier: ^12.2.0
+        version: 12.2.0
+      unplugin-swc:
+        specifier: ^2.0.0
+        version: 2.0.0(@swc/core@1.16.13)(esbuild@0.28.2)(rolldown@1.2.13)(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+      vitest:
+        specifier: ^5.0.3
+        version: 5.0.3(@types/node@22.20.5)(@vitest/coverage-v8@5.0.3)(vite@8.3.3(@types/node@22.20.5)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
   apps/platform-api:
     dependencies:
       '@nestjs/common':
