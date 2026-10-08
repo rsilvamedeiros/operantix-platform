@@ -1,3 +1,4 @@
+import { type Keyring, KeyringError, parseKeyring } from '@operantix/secrets';
 import { z } from 'zod';
 
 const port = z.coerce.number().int().min(1).max(65535);
@@ -16,6 +17,8 @@ const EnvSchema = z.object({
   AUTH_ISSUER: z.url(),
   AUTH_AUDIENCE: z.string().min(1),
   AUTH_JWKS_URI: z.url(),
+  // `id:base64key[,id:base64key...]`, active key first (ADR-0022).
+  SECRETS_ENCRYPTION_KEYS: z.string().min(1),
 });
 
 export interface AppConfig {
@@ -25,6 +28,7 @@ export interface AppConfig {
   redis: { host: string; port: number };
   health: { checkTimeoutMs: number };
   auth: { issuer: string; audience: string; jwksUri: string };
+  secrets: { keyring: Keyring };
 }
 
 export class ConfigValidationError extends Error {
@@ -40,6 +44,16 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
   }
 
   const e = parsed.data;
+  let keyring: Keyring;
+  try {
+    keyring = parseKeyring(e.SECRETS_ENCRYPTION_KEYS);
+  } catch (error) {
+    if (!(error instanceof KeyringError)) throw error;
+    // KeyringError messages name entries and rules, never key material.
+    throw new ConfigValidationError(
+      `Invalid environment configuration: SECRETS_ENCRYPTION_KEYS: ${error.message}`,
+    );
+  }
   return {
     env: e.NODE_ENV,
     port: e.PORT,
@@ -53,5 +67,6 @@ export function loadConfig(env: Record<string, string | undefined>): AppConfig {
     redis: { host: e.REDIS_HOST, port: e.REDIS_PORT },
     health: { checkTimeoutMs: e.HEALTH_CHECK_TIMEOUT_MS },
     auth: { issuer: e.AUTH_ISSUER, audience: e.AUTH_AUDIENCE, jwksUri: e.AUTH_JWKS_URI },
+    secrets: { keyring },
   };
 }

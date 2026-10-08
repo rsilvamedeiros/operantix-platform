@@ -8,6 +8,7 @@ import {
   createWorkflowVersionSchema,
 } from '../workflows/workflow.dto';
 import { startExecutionSchema } from '../executions/execution.dto';
+import { createWebhookEndpointSchema } from '../integrations/webhook-endpoint.dto';
 import * as responses from './responses';
 
 type Method = 'get' | 'post' | 'put' | 'delete';
@@ -15,7 +16,8 @@ type Access = 'public' | 'authenticated' | Permission;
 
 interface Response {
   description: string;
-  schema: z.ZodType;
+  /** Absent for responses without a body (204). */
+  schema?: z.ZodType;
 }
 
 interface Parameter {
@@ -39,6 +41,7 @@ interface Operation {
 
 const error = (description: string): Response => ({ description, schema: responses.errorResponse });
 const ok = (description: string, schema: z.ZodType): Response => ({ description, schema });
+const noContent = (description: string): Response => ({ description });
 
 const ORG = '/api/v1/organizations/{organizationId}';
 const invalidBody = error('`VALIDATION_FAILED`: the body does not match the schema');
@@ -258,6 +261,55 @@ const OPERATIONS: Operation[] = [
     access: 'execution:read',
     responses: { '200': ok('Timeline', responses.executionTimelineResponse) },
   },
+  {
+    method: 'post',
+    path: `${ORG}/webhook-endpoints`,
+    summary: 'Register a webhook endpoint for execution events; returns its signing secret once',
+    tag: 'webhooks',
+    access: 'integration:write',
+    request: createWebhookEndpointSchema,
+    responses: {
+      '201': ok('Created, with the signing secret', responses.webhookEndpointWithSecretResponse),
+      '400': invalidBody,
+    },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/webhook-endpoints`,
+    summary: 'Webhook endpoints of the organization, oldest first',
+    tag: 'webhooks',
+    access: 'integration:read',
+    responses: { '200': ok('Webhook endpoints', responses.webhookEndpointsResponse) },
+  },
+  {
+    method: 'get',
+    path: `${ORG}/webhook-endpoints/{endpointId}`,
+    summary: 'A webhook endpoint (never its secret)',
+    tag: 'webhooks',
+    access: 'integration:read',
+    responses: { '200': ok('Webhook endpoint', responses.webhookEndpointResponse) },
+  },
+  {
+    method: 'post',
+    path: `${ORG}/webhook-endpoints/{endpointId}/rotate-secret`,
+    summary: 'Replace the signing secret at once; returns the new one',
+    tag: 'webhooks',
+    access: 'integration:write',
+    responses: {
+      '200': ok(
+        'Rotated, with the new signing secret',
+        responses.webhookEndpointWithSecretResponse,
+      ),
+    },
+  },
+  {
+    method: 'delete',
+    path: `${ORG}/webhook-endpoints/{endpointId}`,
+    summary: 'Delete a webhook endpoint and its secret',
+    tag: 'webhooks',
+    access: 'integration:write',
+    responses: { '204': noContent('Deleted') },
+  },
 ];
 
 function responsesFor(operation: Operation): Record<string, Response> {
@@ -315,10 +367,12 @@ export function buildOpenApiDocument(): OpenApiDocument {
       responses: Object.fromEntries(
         Object.entries(responsesFor(operation)).map(([status, response]) => [
           status,
-          {
-            description: response.description,
-            content: { 'application/json': { schema: jsonSchema(response.schema, 'output') } },
-          },
+          response.schema
+            ? {
+                description: response.description,
+                content: { 'application/json': { schema: jsonSchema(response.schema, 'output') } },
+              }
+            : { description: response.description },
         ]),
       ),
     };
@@ -351,5 +405,8 @@ export function documentedResponse(
   status: string,
 ): z.ZodType | undefined {
   const operation = OPERATIONS.find((o) => o.method === method && o.path === path);
-  return operation ? responsesFor(operation)[status]?.schema : undefined;
+  const response = operation ? responsesFor(operation)[status] : undefined;
+  if (!response) return undefined;
+  // A documented response without a body: supertest parses it as `{}`.
+  return response.schema ?? z.object({}).strict();
 }

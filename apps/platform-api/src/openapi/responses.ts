@@ -115,3 +115,21 @@ export const executionTimelineResponse = z.object({
     }),
   ),
 });
+
+export const webhookEndpointResponse = z.object({
+  id: z.uuid(),
+  url: z.url(),
+  description: z.string().nullable(),
+  eventTypes: z.array(z.string()),
+  status: z.enum(['ACTIVE', 'DISABLED']),
+  createdAt: timestamp,
+});
+
+export const webhookEndpointsResponse = z.object({ data: z.array(webhookEndpointResponse) });
+
+export const webhookEndpointWithSecretResponse = webhookEndpointResponse.extend({
+  signingSecret: z
+    .string()
+    .regex(/^whsec_[A-Za-z0-9_-]{43}$/)
+    .describe('Shown only now; store it to verify `Operantix-Signature` headers'),
+});
