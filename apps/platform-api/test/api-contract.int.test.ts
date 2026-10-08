@@ -221,5 +221,28 @@ describe('API responses match the OpenAPI contract', () => {
     await call('delete', `${base}/inbound-webhooks/{inboundWebhookId}`, hookIds);
     await call('get', `${base}/inbound-webhooks/{inboundWebhookId}`, hookIds); // 404
     await receive(fresh, 'k-2'); // 404
+
+    const connection = await call('post', `${base}/connections`, ids, {
+      name: 'crm',
+      baseUrl: 'https://api.crm.example.test',
+      auth: { type: 'bearer', token: 'contract-token' },
+    });
+    const connectionIds = { ...ids, connectionId: (connection.body as { id: string }).id };
+    await call('post', `${base}/connections`, ids, {
+      name: 'crm',
+      baseUrl: 'https://api.crm.example.test',
+      auth: { type: 'bearer', token: 'contract-token' },
+    }); // 409
+    await call('post', `${base}/connections`, ids, { name: 'x' }); // 400
+    await call('get', `${base}/connections`, ids);
+    await call('get', `${base}/connections/{connectionId}`, connectionIds);
+    await call('put', `${base}/connections/{connectionId}/credential`, connectionIds, {
+      auth: { type: 'header', headerName: 'X-Api-Key', value: 'k' },
+    });
+    await call('put', `${base}/connections/{connectionId}/credential`, connectionIds, {
+      auth: {},
+    }); // 400
+    await call('delete', `${base}/connections/{connectionId}`, connectionIds);
+    await call('get', `${base}/connections/{connectionId}`, connectionIds); // 404
   });
 });
