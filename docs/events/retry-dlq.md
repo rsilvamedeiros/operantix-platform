@@ -25,6 +25,6 @@ Schema incompatível ou payload inválido não deve bloquear partition indefinid
 - A mensagem na DLQ mantém valor, chave e headers originais (sem os de retry) e acrescenta `dlq-reason`, `dlq-error-code` (código ou nome do erro, nunca a mensagem), `dlq-attempts`, `dlq-source-topic`, `dlq-source-partition`, `dlq-source-offset` e `dlq-at`.
 - Offsets só são commitados depois que o handler terminou ou o evento foi encaminhado. Parar o consumer durante uma espera não commita o retry, que volta no restart.
 
-Convenção de tópicos: cada consumer group tem `<groupId>.retry` e `<groupId>.dlq`, criados em `infrastructure/docker/kafka/create-topics.sh` junto com o consumer que os usa. O primeiro consumer real chega no M05 (integration worker).
+Convenção de tópicos: cada consumer group tem `<groupId>.retry` e `<groupId>.dlq`, criados em `infrastructure/docker/kafka/create-topics.sh` junto com o consumer que os usa. O primeiro consumer é o do integration worker (`opx.integration-worker.webhooks`). As retentativas de entrega de webhook (até 1 h de espera) ficam numa fila no PostgreSQL, não no retry topic (ADR-0023).
 
 Ainda não implementado: re-drive da DLQ (ferramenta explícita e auditada) e métricas de retry/DLQ (M07).

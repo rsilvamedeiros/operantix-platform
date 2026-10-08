@@ -5,6 +5,7 @@ export {
   KafkaEventConsumer,
   type KafkaConsumerOptions,
 } from './kafka-consumer';
+export { PollingLoop, type PollingLoopOptions } from './polling-loop';
 export { KafkaEventPublisher, type KafkaPublisherOptions } from './kafka-publisher';
 export {
   type DeadLetterReason,

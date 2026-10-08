@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { foreignKey, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { foreignKey, integer, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { organizations } from '../organizations/organizations.schema';
 import { secrets } from './secrets.schema';
 
@@ -23,6 +23,9 @@ export const webhookEndpoints = pgTable(
     eventTypes: text('event_types').array().notNull(),
     status: text('status', { enum: webhookEndpointStatuses }).notNull().default('ACTIVE'),
     signingSecretId: uuid('signing_secret_id').notNull(),
+    // Failed delivery attempts since the last success; the integration worker disables the
+    // endpoint when it reaches its threshold (ADR-0023).
+    consecutiveFailures: integer('consecutive_failures').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

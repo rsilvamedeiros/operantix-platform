@@ -12,3 +12,7 @@ create() {
 
 # Execution lifecycle events, keyed by executionId (docs/events/kafka.md).
 create opx.execution.events.v1 6
+
+# Retry and dead-letter topics of the integration worker's webhook consumer (docs/events/retry-dlq.md).
+create opx.integration-worker.webhooks.retry 3
+create opx.integration-worker.webhooks.dlq 3

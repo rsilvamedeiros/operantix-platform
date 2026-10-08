@@ -1,33 +1,24 @@
-import { Logger } from '@nestjs/common';
-
 export interface PollingLoopOptions {
   /** A tick that handled this many items probably left more: poll again without sleeping. */
   batchSize: number;
   pollIntervalMs: number;
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 /**
  * Calls `tick` until stopped, sleeping between ticks that found less than a full batch. A tick
- * that throws is logged and retried after the interval, so an unavailable dependency never
- * stops the loop.
+ * that throws is reported to `onError` and retried after the interval, so an unavailable
+ * dependency never stops the loop.
  */
 export class PollingLoop {
-  private readonly logger: Logger;
   private running = false;
   private current: Promise<void> | undefined;
   private wake: (() => void) | undefined;
 
   constructor(
-    name: string,
     private readonly tick: () => Promise<number>,
     private readonly options: PollingLoopOptions,
-  ) {
-    this.logger = new Logger(name);
-  }
+    private readonly onError: (error: unknown) => void,
+  ) {}
 
   start(): void {
     if (this.running) return;
@@ -48,7 +39,7 @@ export class PollingLoop {
       try {
         handled = await this.tick();
       } catch (error) {
-        this.logger.error({ msg: `Tick failed: ${message(error)}` });
+        this.onError(error);
       }
       if (handled < this.options.batchSize && this.isRunning()) await this.sleep();
     }
