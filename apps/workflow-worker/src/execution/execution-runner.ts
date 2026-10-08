@@ -10,6 +10,7 @@ import {
 import { traceContextFor, traced } from '@operantix/telemetry';
 import { SpanStatusCode } from '@opentelemetry/api';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { recordRun, recordStep } from './execution-metrics';
 import { type Database, type Transaction, withTenant } from '../database';
 import {
   executionEvents,
@@ -70,8 +71,14 @@ export class ExecutionRunner {
    * from the execution id, the same one its events carry (see `publish`).
    */
   run(job: ClaimedJob): Promise<ExecutionOutcome> {
-    return traced('execution.run', { parent: traceContextFor(traceIdOf(job.executionId)) }, () =>
-      this.runInSpan(job),
+    return traced(
+      'execution.run',
+      { parent: traceContextFor(traceIdOf(job.executionId)) },
+      async () => {
+        const outcome = await this.runInSpan(job);
+        recordRun(outcome);
+        return outcome;
+      },
     );
   }
 
@@ -316,7 +323,13 @@ export class ExecutionRunner {
       `step ${definition.type}`,
       { attributes: { 'operantix.step.type': definition.type } },
       async (span) => {
+        const started = performance.now();
         const result = await this.dispatchStep(definition, context);
+        recordStep(
+          definition.type,
+          'failure' in result ? 'failure' : 'suspendedUntil' in result ? 'suspended' : 'success',
+          performance.now() - started,
+        );
         if ('failure' in result) {
           // Code only: the message can carry user data or a remote system's answer.
           span.setStatus({ code: SpanStatusCode.ERROR });
