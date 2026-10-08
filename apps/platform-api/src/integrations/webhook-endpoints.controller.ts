@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Put,
 } from '@nestjs/common';
 import { RequirePermission } from '../authorization/require-permission.decorator';
 import { UuidParamPipe } from '../shared/path-params';
@@ -16,12 +17,14 @@ import type { TenantContext } from '../tenancy/tenant-context';
 import {
   type CreateWebhookEndpointInput,
   createWebhookEndpointSchema,
+  type SetWebhookEndpointStatusInput,
+  setWebhookEndpointStatusSchema,
   type WebhookEndpointView,
   type WebhookEndpointWithSecretView,
 } from './webhook-endpoint.dto';
 import { WebhookEndpointNotFoundError, WebhookEndpointsService } from './webhook-endpoints.service';
 
-const endpointNotFound = () =>
+export const endpointNotFound = () =>
   new NotFoundException({
     code: 'WEBHOOK_ENDPOINT_NOT_FOUND',
     message: 'Webhook endpoint not found',
@@ -73,6 +76,17 @@ export class WebhookEndpointsController {
     @Param('endpointId', new UuidParamPipe(endpointNotFound)) endpointId: string,
   ): Promise<WebhookEndpointWithSecretView> {
     return mapped(this.endpoints.rotateSecret(tenant, endpointId));
+  }
+
+  @RequirePermission('integration:write')
+  @Put(':endpointId/status')
+  setStatus(
+    @CurrentTenant() tenant: TenantContext,
+    @Param('endpointId', new UuidParamPipe(endpointNotFound)) endpointId: string,
+    @Body(new ZodValidationPipe(setWebhookEndpointStatusSchema))
+    input: SetWebhookEndpointStatusInput,
+  ): Promise<WebhookEndpointView> {
+    return mapped(this.endpoints.setStatus(tenant, endpointId, input));
   }
 
   @RequirePermission('integration:write')
