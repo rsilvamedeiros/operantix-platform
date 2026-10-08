@@ -41,16 +41,24 @@ export async function traced<T>(
 ): Promise<T> {
   const span = startSpan(name, options);
   try {
-    return await context.with(trace.setSpan(options.parent ?? context.active(), span), () =>
+    const result = await context.with(trace.setSpan(options.parent ?? context.active(), span), () =>
       fn(span),
     );
+    endSpan(span);
+    return result;
   } catch (error) {
+    endSpan(span, error);
+    throw error;
+  }
+}
+
+/** Ends a span; with an error, records it and marks the span failed first. */
+export function endSpan(span: Span, error?: unknown): void {
+  if (error !== undefined) {
     span.recordException(error instanceof Error ? error : new Error(String(error)));
     span.setStatus({ code: SpanStatusCode.ERROR });
-    throw error;
-  } finally {
-    span.end();
   }
+  span.end();
 }
 
 /**
@@ -66,9 +74,13 @@ export function traceContextFor(traceId: string, parent: Context = context.activ
   });
 }
 
-/** Writes the active trace context into message headers (W3C `traceparent`). */
-export function injectTraceContext(carrier: Record<string, string>): void {
-  propagation.inject(context.active(), carrier);
+/**
+ * Writes a trace context into message headers (W3C `traceparent`): the given span's, or the
+ * active one when none is given.
+ */
+export function injectTraceContext(carrier: Record<string, string>, span?: Span): void {
+  const source = span === undefined ? context.active() : trace.setSpan(context.active(), span);
+  propagation.inject(source, carrier);
 }
 
 /** Context carried by message headers, or the root context when there is none or it is garbled. */
