@@ -5,6 +5,7 @@ description = "Operantix AI service: LLM-backed capabilities behind a provider g
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "anthropic>=1.12.1",
     "fastapi>=0.143.0",
     "pydantic>=2.14.0",
     "pydantic-settings>=2.15.0",
@@ -16,9 +17,10 @@ ai-service = "ai_service.main:main"
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.13.1",
     "mypy>=2.4.0",
     "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1.0",
     "ruff>=0.16.10",
 ]
@@ -50,6 +52,8 @@ packages = ["ai_service", "tests"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 branch = true
