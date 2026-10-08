@@ -39,7 +39,9 @@ describe('installHttpObservability', () => {
   });
 
   it('honours the id sent by the caller', async () => {
-    const res = await request(await start()).get('/probe').set('x-correlation-id', 'caller-42');
+    const res = await request(await start())
+      .get('/probe')
+      .set('x-correlation-id', 'caller-42');
     expect(res.headers['x-correlation-id']).toBe('caller-42');
     expect(res.body).toEqual({ correlationId: 'caller-42' });
   });
