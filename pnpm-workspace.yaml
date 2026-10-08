@@ -4,6 +4,10 @@ packages:
 
 # Install scripts we don't need: SWC ships prebuilt binaries via optional deps,
 # and the native ssh2/cpu-features/protobufjs builds are optional for Testcontainers.
+# The Confluent Kafka client downloads its prebuilt librdkafka binding at install (ADR-0020).
+onlyBuiltDependencies:
+  - '@confluentinc/kafka-javascript'
+
 ignoredBuiltDependencies:
   - '@swc/core'
   - cpu-features
