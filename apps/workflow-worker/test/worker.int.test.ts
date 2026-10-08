@@ -1,4 +1,7 @@
 import { parseEvent } from '@operantix/contracts';
+import { startTracing } from '@operantix/telemetry';
+import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database';
 import type { WorkflowStep } from '../src/engine.schema';
@@ -148,6 +151,77 @@ describe('workflow worker against PostgreSQL', () => {
       },
     ]);
     expect(await jobCount(seeded.executionId)).toBe(0);
+  });
+
+  describe('tracing', () => {
+    const traced = async (run: () => Promise<void>) => {
+      const exporter = new InMemorySpanExporter();
+      const tracing = startTracing(
+        {
+          serviceName: 'worker-test',
+          environment: 'test',
+          endpoint: 'http://unused:4318',
+          sampleRatio: 1,
+        },
+        { spanExporter: exporter, instrument: false },
+      );
+      try {
+        await run();
+        return exporter.getFinishedSpans();
+      } finally {
+        await tracing.shutdown();
+      }
+    };
+
+    it('puts a run and its steps in the execution trace', async () => {
+      const seeded = await database.seedExecution([log('first'), log('second')]);
+
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
+
+      const traceId = seeded.executionId.replaceAll('-', '');
+      expect(spans.map((span) => span.spanContext().traceId)).toEqual(Array(3).fill(traceId));
+      const run = spans.find((span) => span.name === 'execution.run');
+      const stepSpans = spans.filter((span) => span.name === 'step log');
+      expect(run?.kind).toBe(SpanKind.INTERNAL);
+      expect(stepSpans).toHaveLength(2);
+      for (const step of stepSpans) {
+        expect(step.parentSpanContext?.spanId).toBe(run?.spanContext().spanId);
+        expect(step.status.code).toBe(SpanStatusCode.UNSET);
+        expect(step.attributes).toMatchObject({ 'operantix.step.type': 'log' });
+      }
+    });
+
+    it('marks the span of a failing step, without its message', async () => {
+      const seeded = await database.seedExecution([
+        { id: 'call', name: 'Call', type: 'boom', config: {} },
+      ]);
+
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
+
+      const step = spans.find((span) => span.name === 'step boom');
+      expect(step?.status.code).toBe(SpanStatusCode.ERROR);
+      expect(step?.attributes['operantix.error.code']).toBe('STEP_ERROR');
+      expect(JSON.stringify(spans.map((span) => span.attributes))).not.toContain('remote said no');
+      expect(seeded.executionId).toBeDefined();
+    });
+
+    it('does not mark a step that parks itself as failed', async () => {
+      await database.seedExecution([
+        { id: 'wait', name: 'Wait', type: 'delay', config: { seconds: 3600 } },
+      ]);
+
+      const spans = await traced(async () => {
+        await loop.tick();
+      });
+
+      expect(spans.find((span) => span.name === 'step delay')?.status.code).toBe(
+        SpanStatusCode.UNSET,
+      );
+    });
   });
 
   it('records the timeline of a run', async () => {

@@ -1,5 +1,7 @@
 import { type AnyEvent, parseEvent } from '@operantix/contracts';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
+import { extractTraceContext, traced } from '@operantix/telemetry';
+import { SpanKind } from '@opentelemetry/api';
 import type { EventPublisher } from './event-publisher';
 import {
   decodeHeaders,
@@ -120,7 +122,23 @@ export class KafkaEventConsumer {
     }
 
     try {
-      await this.handler({ event, attempt, topic: source.topic });
+      // The producer's span (from `traceparent`) is the parent; retries keep the header, so every
+      // attempt lands in the same trace.
+      await traced(
+        `${source.topic} process`,
+        {
+          kind: SpanKind.CONSUMER,
+          parent: extractTraceContext(headers),
+          attributes: {
+            'messaging.system': 'kafka',
+            'messaging.destination.name': source.topic,
+            'messaging.operation.type': 'process',
+            'operantix.event.type': event.eventType,
+            'operantix.event.attempt': attempt,
+          },
+        },
+        () => this.handler({ event, attempt, topic: source.topic }),
+      );
     } catch (error) {
       const route = routeFailure(error, attempt, this.options.retry, new Date());
       if (route.kind === 'dead-letter') {

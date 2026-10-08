@@ -1,6 +1,7 @@
-import { randomBytes } from 'node:crypto';
 import { parseEvent } from '@operantix/contracts';
 import type { EventPublisher, OutgoingMessage } from '@operantix/messaging';
+import { endSpan, injectTraceContext, startSpan, traceContextFor } from '@operantix/telemetry';
+import { type Span, SpanKind } from '@opentelemetry/api';
 import type { Pool, PoolClient } from 'pg';
 
 export interface OutboxRelayOptions {
@@ -47,7 +48,14 @@ export class OutboxRelay {
       [this.options.batchSize],
     );
     if (rows.length === 0) return 0;
-    await this.publisher.publish(rows.map(toMessage));
+    const publications = rows.map(toPublication);
+    try {
+      await this.publisher.publish(publications.map(({ message }) => message));
+    } catch (error) {
+      for (const { span } of publications) endSpan(span, error);
+      throw error;
+    }
+    for (const { span } of publications) endSpan(span);
     await this.pool.query(
       'UPDATE outbox_events SET published_at = now() WHERE id = ANY($1::bigint[])',
       [rows.map((row) => row.id)],
@@ -104,21 +112,42 @@ export class OutboxRelay {
   }
 }
 
-/** The envelope as the message value, keyed for ordering, with headers for routing and tracing. */
-function toMessage(row: OutboxRow): OutgoingMessage {
+interface Publication {
+  message: OutgoingMessage;
+  span: Span;
+}
+
+/**
+ * The envelope as the message value, keyed for ordering, with headers for routing and tracing. The
+ * producer span belongs to the event's trace (one per execution), and its context goes out as
+ * `traceparent`, so a consumer's span descends from it.
+ */
+function toPublication(row: OutboxRow): Publication {
   // Rows are written only through createEvent; parsing again keeps the headers type-safe and
   // stops a corrupted row loudly instead of publishing it.
   const event = parseEvent(row.payload);
-  return {
-    topic: row.topic,
-    key: row.partition_key,
-    value: JSON.stringify(row.payload),
-    headers: {
-      'event-id': event.eventId,
-      'event-type': event.eventType,
-      'event-version': String(event.eventVersion),
-      // W3C trace context: the event's trace, with a span id for this publication.
-      traceparent: `00-${event.traceId}-${randomBytes(8).toString('hex')}-01`,
+  const span = startSpan(`${row.topic} publish`, {
+    kind: SpanKind.PRODUCER,
+    parent: traceContextFor(event.traceId),
+    attributes: {
+      'messaging.system': 'kafka',
+      'messaging.destination.name': row.topic,
+      'operantix.event.type': event.eventType,
     },
+  });
+  const headers: Record<string, string> = {
+    'event-id': event.eventId,
+    'event-type': event.eventType,
+    'event-version': String(event.eventVersion),
+  };
+  injectTraceContext(headers, span);
+  return {
+    message: {
+      topic: row.topic,
+      key: row.partition_key,
+      value: JSON.stringify(row.payload),
+      headers,
+    },
+    span,
   };
 }

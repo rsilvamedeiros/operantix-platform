@@ -15,3 +15,12 @@ export {
   TracingConfigError,
 } from './tracing';
 export type { StartTracingOptions, TracingConfig, TracingHandle } from './tracing';
+export {
+  endSpan,
+  extractTraceContext,
+  injectTraceContext,
+  startSpan,
+  traceContextFor,
+  traced,
+} from './spans';
+export type { SpanOptions } from './spans';

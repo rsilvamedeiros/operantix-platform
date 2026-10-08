@@ -7,6 +7,8 @@ import {
   partitionKey,
   topicFor,
 } from '@operantix/contracts';
+import { traceContextFor, traced } from '@operantix/telemetry';
+import { SpanStatusCode } from '@opentelemetry/api';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { type Database, type Transaction, withTenant } from '../database';
 import {
@@ -63,7 +65,17 @@ export class ExecutionRunner {
     private readonly retry: RetryPolicy = { maxStepAttempts: 3, baseDelayMs: 2_000 },
   ) {}
 
-  async run(job: ClaimedJob): Promise<ExecutionOutcome> {
+  /**
+   * Every run of an execution, including those after a delay or a retry, joins the trace derived
+   * from the execution id, the same one its events carry (see `publish`).
+   */
+  run(job: ClaimedJob): Promise<ExecutionOutcome> {
+    return traced('execution.run', { parent: traceContextFor(traceIdOf(job.executionId)) }, () =>
+      this.runInSpan(job),
+    );
+  }
+
+  private async runInSpan(job: ClaimedJob): Promise<ExecutionOutcome> {
     const tenant = <T>(fn: (tx: Transaction) => Promise<T>) =>
       withTenant(this.db, job.organizationId, fn);
     const scope = { organizationId: job.organizationId, executionId: job.executionId };
@@ -300,6 +312,25 @@ export class ExecutionRunner {
         },
       };
     }
+    return traced(
+      `step ${definition.type}`,
+      { attributes: { 'operantix.step.type': definition.type } },
+      async (span) => {
+        const result = await this.dispatchStep(definition, context);
+        if ('failure' in result) {
+          // Code only: the message can carry user data or a remote system's answer.
+          span.setStatus({ code: SpanStatusCode.ERROR });
+          span.setAttribute('operantix.error.code', result.failure.code);
+        }
+        return result;
+      },
+    );
+  }
+
+  private async dispatchStep(
+    definition: WorkflowStep,
+    context: StepContext,
+  ): Promise<{ output: unknown } | { failure: StepFailure } | { suspendedUntil: Date }> {
     try {
       return { output: (await this.dispatcher.dispatch(definition, context)) ?? null };
     } catch (error) {
@@ -398,9 +429,8 @@ async function publish<T extends EventType>(
     eventId: randomUUID(),
     occurredAt: new Date(),
     producer: 'workflow-worker',
-    // One trace per execution, derived from its id, until OpenTelemetry (M07) supplies the
-    // active span's trace id. A UUID without dashes is 32 hex characters.
-    traceId: job.executionId.replaceAll('-', ''),
+    // One trace per execution, derived from its id (ADR-0030).
+    traceId: traceIdOf(job.executionId),
     tenant: { organizationId: job.organizationId },
   });
   await tx.insert(outboxEvents).values({
@@ -430,4 +460,9 @@ async function publishStepFailure(
 /** The failure without its message, which may quote the destination. */
 function failureDetails(failure: StepFailure): Record<string, unknown> {
   return { code: failure.code, retryable: failure.retryable };
+}
+
+/** A UUID without dashes is 32 hex characters, a valid W3C trace id. */
+function traceIdOf(executionId: string): string {
+  return executionId.replaceAll('-', '');
 }

@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import type { KafkaJS } from '@confluentinc/kafka-javascript';
 import { type AnyEvent, createEvent, parseEvent } from '@operantix/contracts';
 import { startKafka, type TestKafka } from '@operantix/testing';
+import { SpanKind, SpanStatusCode, trace } from '@opentelemetry/api';
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
+import { startTracing } from '@operantix/telemetry';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { type EventDelivery, type EventHandler, KafkaEventConsumer } from '../src/kafka-consumer';
 import { KafkaEventPublisher } from '../src/kafka-publisher';
@@ -250,5 +253,60 @@ describe('Kafka event consumer', () => {
       [sent.eventId, 1],
       [sent.eventId, 2],
     ]);
+  });
+
+  it('processes each delivery in a consumer span that continues the producer trace', async () => {
+    const exporter = new InMemorySpanExporter();
+    const tracing = startTracing(
+      {
+        serviceName: 'consumer-test',
+        environment: 'test',
+        endpoint: 'http://unused:4318',
+        sampleRatio: 1,
+      },
+      { spanExporter: exporter, instrument: false },
+    );
+    try {
+      const names = await topics('tracing');
+      const sent = event();
+      const traceId = 'a'.repeat(32);
+      const producerSpanId = 'b'.repeat(16);
+      const seen: string[] = [];
+      await consume(
+        names,
+        () => {
+          seen.push(trace.getActiveSpan()?.spanContext().traceId ?? 'none');
+          return Promise.reject(new Error('db down'));
+        },
+        { maxAttempts: 1 },
+      );
+
+      await publisher.publish([
+        {
+          topic: names.source,
+          key: 'key',
+          value: JSON.stringify(sent),
+          headers: { traceparent: `00-${traceId}-${producerSpanId}-01` },
+        },
+      ]);
+      await waitFor(() => seen.length === 1);
+      await waitFor(() => exporter.getFinishedSpans().length === 1);
+
+      expect(seen).toEqual([traceId]);
+      const [span] = exporter.getFinishedSpans();
+      expect(span?.name).toBe(`${names.source} process`);
+      expect(span?.kind).toBe(SpanKind.CONSUMER);
+      expect(span?.spanContext().traceId).toBe(traceId);
+      expect(span?.parentSpanContext?.spanId).toBe(producerSpanId);
+      expect(span?.attributes).toMatchObject({
+        'messaging.system': 'kafka',
+        'messaging.destination.name': names.source,
+        'operantix.event.type': 'execution.completed',
+        'operantix.event.attempt': 1,
+      });
+      expect(span?.status.code).toBe(SpanStatusCode.ERROR);
+    } finally {
+      await tracing.shutdown();
+    }
   });
 });

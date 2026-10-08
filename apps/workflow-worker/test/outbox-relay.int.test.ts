@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { createEvent, parseEvent } from '@operantix/contracts';
 import { KafkaEventPublisher } from '@operantix/messaging';
+import { startTracing } from '@operantix/telemetry';
 import { startKafka, type TestKafka } from '@operantix/testing';
+import { SpanKind, SpanStatusCode } from '@opentelemetry/api';
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createDatabase } from '../src/database';
 import { ExecutionRunner } from '../src/execution/execution-runner';
@@ -125,6 +128,46 @@ describe('outbox relay', () => {
       new RegExp(`^00-${executionId.replaceAll('-', '')}-[0-9a-f]{16}-01$`),
     );
     expect(await unpublished()).toBe(0);
+  });
+
+  it('publishes each event inside a producer span of the execution trace', async () => {
+    const exporter = new InMemorySpanExporter();
+    const tracing = startTracing(
+      {
+        serviceName: 'relay-test',
+        environment: 'test',
+        endpoint: 'http://unused:4318',
+        sampleRatio: 1,
+      },
+      { spanExporter: exporter, instrument: false },
+    );
+    try {
+      await kafka.createTopic('test.relay.spans.v1');
+      const { executionId } = await enqueue('test.relay.spans.v1', 2);
+
+      expect(await newRelay().tick()).toBe(2);
+
+      const received = await kafka.consume('test.relay.spans.v1', 2);
+      const spans = exporter.getFinishedSpans();
+      expect(spans).toHaveLength(2);
+      for (const [index, span] of spans.entries()) {
+        expect(span.name).toBe('test.relay.spans.v1 publish');
+        expect(span.kind).toBe(SpanKind.PRODUCER);
+        expect(span.status.code).toBe(SpanStatusCode.UNSET);
+        expect(span.spanContext().traceId).toBe(executionId.replaceAll('-', ''));
+        // The header a consumer continues from names this very span.
+        expect(String(received[index]?.headers?.traceparent)).toBe(
+          `00-${span.spanContext().traceId}-${span.spanContext().spanId}-01`,
+        );
+        expect(span.attributes).toMatchObject({
+          'messaging.system': 'kafka',
+          'messaging.destination.name': 'test.relay.spans.v1',
+          'operantix.event.type': 'execution.step.started',
+        });
+      }
+    } finally {
+      await tracing.shutdown();
+    }
   });
 
   it('publishes at most one batch per tick', async () => {
