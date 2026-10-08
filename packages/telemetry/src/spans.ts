@@ -55,7 +55,11 @@ export async function traced<T>(
 /** Ends a span; with an error, records it and marks the span failed first. */
 export function endSpan(span: Span, error?: unknown): void {
   if (error !== undefined) {
-    span.recordException(error instanceof Error ? error : new Error(String(error)));
+    span.recordException(
+      error instanceof Error
+        ? error
+        : new Error(typeof error === 'string' ? error : 'non-error thrown'),
+    );
     span.setStatus({ code: SpanStatusCode.ERROR });
   }
   span.end();
