@@ -143,6 +143,41 @@ describe('worker database role', () => {
     });
   });
 
+  const insertOutbox = async (scope: string, organizationId: string) => {
+    const client = await worker.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`SELECT set_config('app.organization_id', $1, true)`, [scope]);
+      await client.query(
+        `INSERT INTO outbox_events (organization_id, event_id, topic, partition_key, event_type, payload)
+         VALUES ($1, $2, 'opx.execution.events.v1', $3, 'execution.started', '{}')`,
+        [organizationId, randomUUID(), executionOf[organizationId]],
+      );
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  };
+
+  it('writes outbox events inside a tenant scope, but cannot read them back', async () => {
+    await insertOutbox(acme, acme);
+
+    const { rows } = await database.ownerPool.query<{ organization_id: string }>(
+      'SELECT organization_id FROM outbox_events',
+    );
+    expect(rows).toEqual([{ organization_id: acme }]);
+    await expect(worker.query('SELECT 1 FROM outbox_events')).rejects.toMatchObject({
+      code: '42501',
+    });
+  });
+
+  it('cannot write an outbox event for another tenant', async () => {
+    await expect(insertOutbox(acme, globex)).rejects.toMatchObject({ code: '42501' });
+  });
+
   it('cannot create executions or jobs', async () => {
     await expect(
       worker.query('INSERT INTO execution_jobs (organization_id, execution_id) VALUES ($1, $2)', [
