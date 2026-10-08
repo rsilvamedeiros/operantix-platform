@@ -14,6 +14,7 @@ export interface KafkaPublisherOptions {
  */
 export class KafkaEventPublisher implements EventPublisher {
   private readonly producer: KafkaJS.Producer;
+  private connection: Promise<void> | undefined;
 
   constructor(options: KafkaPublisherOptions) {
     const kafka = new KafkaJS.Kafka({
@@ -29,16 +30,24 @@ export class KafkaEventPublisher implements EventPublisher {
     });
   }
 
-  async connect(): Promise<void> {
-    await this.producer.connect();
+  /** Connects once; later calls share the connection. A failed attempt is retried next call. */
+  connect(): Promise<void> {
+    this.connection ??= this.producer.connect().catch((error: unknown) => {
+      this.connection = undefined;
+      throw error;
+    });
+    return this.connection;
   }
 
   async disconnect(): Promise<void> {
+    if (!this.connection) return;
+    this.connection = undefined;
     await this.producer.disconnect();
   }
 
   async publish(messages: readonly OutgoingMessage[]): Promise<void> {
     if (messages.length === 0) return;
+    await this.connect();
     const byTopic = new Map<string, KafkaJS.Message[]>();
     for (const { topic, key, value, headers } of messages) {
       const batch = byTopic.get(topic) ?? [];
