@@ -8,6 +8,8 @@ Endpoints de criação/trigger críticos aceitam `Idempotency-Key` quando o clie
 
 Persistir `eventId`/operation key ou usar state transition protegida para impedir side effects duplicados.
 
+O relay da outbox e o `KafkaEventConsumer` entregam at-least-once: um crash entre o efeito e o commit do offset, ou um retry, entrega o mesmo `eventId` de novo. O handler registra o `eventId` na mesma transação do efeito (ex.: tabela `processed_events` com PK por consumer + `eventId`) e trata duplicata como sucesso.
+
 ## External calls
 
 Usar provider idempotency key quando suportado. Se não suportado, registrar attempt e reconciliar efeitos.
