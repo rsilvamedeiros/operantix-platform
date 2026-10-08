@@ -41,6 +41,8 @@ describe('outbox relay', () => {
   beforeEach(async () => {
     await Promise.all(relays.splice(0).map((relay) => relay.release()));
     await database.owner.query('DELETE FROM outbox_events');
+    // Seeded executions come with a job; only the end-to-end test runs one.
+    await database.owner.query('DELETE FROM execution_jobs');
   });
 
   afterAll(async () => {
@@ -56,7 +58,8 @@ describe('outbox relay', () => {
     count: number,
     options: { publishedAgo?: string; createdAgo?: string } = {},
   ) => {
-    const { organizationId, executionId } = await database.seedExecution([]);
+    const { organizationId, executionId, jobId } = await database.seedExecution([]);
+    await database.owner.query('DELETE FROM execution_jobs WHERE id = $1', [jobId]);
     const events = Array.from({ length: count }, (_, attempt) =>
       createEvent(
         'execution.step.started',
