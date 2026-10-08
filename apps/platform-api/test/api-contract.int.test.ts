@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { createHmac } from 'node:crypto';
 import type { Server } from 'node:http';
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -183,5 +184,42 @@ describe('API responses match the OpenAPI contract', () => {
     );
     await call('delete', `${base}/webhook-endpoints/{endpointId}`, endpointIds);
     await call('get', `${base}/webhook-endpoints/{endpointId}`, endpointIds); // 404
+
+    const hook = await call('post', `${base}/inbound-webhooks`, ids, { workflowId });
+    const { id: inboundWebhookId, signingSecret } = hook.body as {
+      id: string;
+      signingSecret: string;
+    };
+    const hookIds = { ...ids, inboundWebhookId };
+    await call('post', `${base}/inbound-webhooks`, ids, { workflowId: 'nope' }); // 400
+    await call('get', `${base}/inbound-webhooks`, ids);
+    await call('get', `${base}/inbound-webhooks/{inboundWebhookId}`, hookIds);
+    const rotated = await call(
+      'post',
+      `${base}/inbound-webhooks/{inboundWebhookId}/rotate-secret`,
+      hookIds,
+    );
+    const receive = async (secret: string, key: string) => {
+      const template = '/hooks/v1/{organizationId}/{inboundWebhookId}';
+      const body = JSON.stringify({ orderId: 'o-2' });
+      const at = String(Math.floor(Date.now() / 1000));
+      const v1 = createHmac('sha256', secret).update(`${at}.${body}`).digest('hex');
+      const res = await request(httpServer(app))
+        .post(`/hooks/v1/${organizationId}/${inboundWebhookId}`)
+        .set('Content-Type', 'application/json')
+        .set('Operantix-Signature', `t=${at},v1=${v1}`)
+        .set('Idempotency-Key', key)
+        .send(body);
+      const schema = documentedResponse('post', template, String(res.status));
+      expect(schema, `POST ${template} ${String(res.status)} is documented`).toBeDefined();
+      schema?.parse(res.body);
+    };
+    await receive(signingSecret, 'k-1'); // 401, rotated away
+    const fresh = (rotated.body as { signingSecret: string }).signingSecret;
+    await receive(fresh, 'k-1'); // 202
+    await receive(fresh, 'k-1'); // 200 replay
+    await call('delete', `${base}/inbound-webhooks/{inboundWebhookId}`, hookIds);
+    await call('get', `${base}/inbound-webhooks/{inboundWebhookId}`, hookIds); // 404
+    await receive(fresh, 'k-2'); // 404
   });
 });
