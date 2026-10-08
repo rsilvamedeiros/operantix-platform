@@ -1,6 +1,6 @@
 import { EVENT_TYPES } from '@operantix/contracts';
 import { z } from 'zod';
-import type { WebhookEndpointStatus } from './webhook-endpoints.schema';
+import { type WebhookEndpointStatus, webhookEndpointStatuses } from './webhook-endpoints.schema';
 
 const endpointUrl = z
   .url({ protocol: /^https?$/ })
@@ -21,12 +21,17 @@ export const createWebhookEndpointSchema = z.object({
 });
 export type CreateWebhookEndpointInput = z.output<typeof createWebhookEndpointSchema>;
 
+export const setWebhookEndpointStatusSchema = z.object({ status: z.enum(webhookEndpointStatuses) });
+export type SetWebhookEndpointStatusInput = z.output<typeof setWebhookEndpointStatusSchema>;
+
 export interface WebhookEndpointView {
   id: string;
   url: string;
   description: string | null;
   eventTypes: string[];
   status: WebhookEndpointStatus;
+  /** Failed deliveries in a row; the worker disables the endpoint at its threshold. */
+  consecutiveFailures: number;
   createdAt: Date;
 }
 

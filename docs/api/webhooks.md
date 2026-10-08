@@ -33,5 +33,16 @@ O corpo é o envelope do evento (`docs/events/event-envelope.md`).
 - `2xx` em até 10 s confirma a entrega. O corpo da resposta é ignorado.
 - `408`, `425`, `429`, `5xx`, timeout ou falha de conexão: nova tentativa com backoff exponencial (30 s, 1 min, 2 min... até 1 h), até 8 tentativas.
 - Outros `4xx` e redirects (nunca seguidos): a entrega falha na hora.
-- Depois de 20 tentativas falhas seguidas, o endpoint é desativado (`status: DISABLED`) e as entregas pendentes dele falham.
+- Depois de 20 tentativas falhas seguidas, o endpoint é desativado (`status: DISABLED`) e as entregas pendentes dele falham. `consecutiveFailures` no endpoint mostra quanto falta.
 - Endereços privados, loopback e de metadata de cloud são recusados (`DESTINATION_BLOCKED`), inclusive depois de resolução DNS.
+
+### Histórico, reenvio e reativação
+
+Sob `/api/v1/organizations/{organizationId}/webhook-endpoints/{endpointId}`:
+
+- `GET /deliveries`: entregas do endpoint, mais novas primeiro, com `limit` e `cursor` (keyset). Sem o payload, que é o próprio evento.
+- `GET /deliveries/{deliveryId}`: a entrega com `attemptHistory` (status HTTP ou código de erro e duração de cada tentativa; nunca corpos).
+- `POST /deliveries/{deliveryId}/retry`: devolve uma entrega `FAILED` para a fila, com as tentativas zeradas. O histórico anterior fica. `409 WEBHOOK_DELIVERY_NOT_FAILED` se ela não falhou; `409 WEBHOOK_ENDPOINT_DISABLED` se o endpoint estiver desativado.
+- `PUT /status` com `{"status":"ACTIVE"|"DISABLED"}`: reativar zera `consecutiveFailures`. Repetir o status atual não muda nada.
+
+Ler exige `integration:read`; reenviar e mudar status, `integration:write`. Reenvio e mudança de status são auditados (`webhook_delivery.retried`, `webhook_endpoint.enabled`, `webhook_endpoint.disabled`).

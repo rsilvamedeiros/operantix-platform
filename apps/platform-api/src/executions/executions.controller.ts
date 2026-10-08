@@ -32,9 +32,9 @@ import {
   ExecutionsService,
   ExecutionWorkflowNotFoundError,
   IdempotencyKeyReusedError,
-  InvalidCursorError,
   WorkflowInactiveError,
 } from './executions.service';
+import { InvalidCursorError } from '../shared/keyset-cursor';
 
 const workflowNotFound = () =>
   new NotFoundException({ code: 'WORKFLOW_NOT_FOUND', message: 'Workflow not found' });

@@ -118,6 +118,7 @@ describe('webhook endpoints API', () => {
       description: 'Ops channel',
       eventTypes: ['execution.completed', 'execution.failed'],
       status: 'ACTIVE',
+      consecutiveFailures: 0,
       createdAt: expect.any(String) as unknown,
       signingSecret: expect.stringMatching(/^whsec_[A-Za-z0-9_-]{43}$/) as unknown,
     });
