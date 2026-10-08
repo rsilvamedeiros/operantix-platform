@@ -63,3 +63,6 @@ jobs:
 
       - name: Test workflow worker with coverage
         run: pnpm --filter @operantix/workflow-worker test:coverage
+
+      - name: Test integration worker with coverage
+        run: pnpm --filter @operantix/integration-worker test:coverage
