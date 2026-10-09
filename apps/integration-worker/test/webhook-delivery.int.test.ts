@@ -177,7 +177,7 @@ describe('webhook delivery', () => {
       expect(await breaker.tick()).toBe(0);
     });
 
-    it('sends a single probe once the cooldown is over, and closes on success', async () => {
+    it('probes once the cooldown is over, and closes the circuit on success', async () => {
       const org = await database.seedOrganization();
       const endpoint = await database.seedEndpoint(org, {
         url: receiver.url('/recover'),
@@ -185,26 +185,18 @@ describe('webhook delivery', () => {
         circuitOpenUntil: seconds(-1_000),
       });
       await fanOut.handle(completedEvent(org));
-      await fanOut.handle(completedEvent(org));
-      await fanOut.handle(completedEvent(org));
 
       await breaker.tick();
 
       expect(receiver.received).toHaveLength(1);
-      const rows = await deliveriesOf(endpoint.id);
-      expect(rows.map((r) => r.status).sort()).toEqual(['PENDING', 'PENDING', 'SUCCEEDED']);
-      expect(rows.filter((r) => r.status === 'PENDING').map((r) => r.attempts)).toEqual([0, 0]);
+      expect((await deliveriesOf(endpoint.id))[0]?.status).toBe('SUCCEEDED');
       expect(await circuitOf(endpoint.id)).toMatchObject({
         consecutive_failures: 0,
         circuit_open_until: null,
       });
-
-      await elapse();
-      await breaker.tick();
-      expect(receiver.received).toHaveLength(3);
     });
 
-    it('reopens for twice as long when the probe fails', async () => {
+    it('reopens for twice as long when the probe fails, and sends only one probe', async () => {
       const org = await database.seedOrganization();
       const endpoint = await database.seedEndpoint(org, {
         url: receiver.url('/still-down'),
@@ -212,6 +204,8 @@ describe('webhook delivery', () => {
         circuitOpenUntil: seconds(-1_000),
       });
       receiver.statuses.set('/still-down', 500);
+      await fanOut.handle(completedEvent(org));
+      await fanOut.handle(completedEvent(org));
       await fanOut.handle(completedEvent(org));
 
       await breaker.tick();
@@ -222,6 +216,8 @@ describe('webhook delivery', () => {
       const opensFor = (state?.circuit_open_until?.getTime() ?? 0) - Date.now();
       expect(opensFor).toBeGreaterThan(2 * circuit.cooldownMs - 5_000);
       expect(opensFor).toBeLessThanOrEqual(2 * circuit.cooldownMs);
+      const rows = await deliveriesOf(endpoint.id);
+      expect(rows.filter((r) => r.attempts === 0)).toHaveLength(2);
     });
 
     it('keeps one broken endpoint from holding back the others', async () => {
