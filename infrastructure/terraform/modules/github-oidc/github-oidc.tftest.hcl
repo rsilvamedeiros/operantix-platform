@@ -27,16 +27,16 @@ run "only_this_repository_and_environment_can_assume_the_role" {
   command = apply
 
   assert {
-    condition = one([
+    condition = toset(one([
       for c in data.aws_iam_policy_document.assume.statement[0].condition : c.values if c.variable == "token.actions.githubusercontent.com:sub"
-    ]) == toset(["repo:acme/platform:environment:dev"])
+    ])) == toset(["repo:acme/platform:environment:dev"])
     error_message = "The trust policy must name the repository and environment."
   }
 
   assert {
-    condition = one([
+    condition = toset(one([
       for c in data.aws_iam_policy_document.assume.statement[0].condition : c.values if c.variable == "token.actions.githubusercontent.com:aud"
-    ]) == toset(["sts.amazonaws.com"])
+    ])) == toset(["sts.amazonaws.com"])
     error_message = "The audience must be STS."
   }
 }
@@ -65,16 +65,16 @@ run "may_hand_only_the_listed_roles_to_ecs" {
   command = apply
 
   assert {
-    condition = one([
+    condition = toset(one([
       for s in data.aws_iam_policy_document.deploy.statement : s.resources if contains(s.actions, "iam:PassRole")
-    ]) == toset(["arn:aws:iam::123456789012:role/test-api-execution", "arn:aws:iam::123456789012:role/test-api-task"])
+    ])) == toset(["arn:aws:iam::123456789012:role/test-api-execution", "arn:aws:iam::123456789012:role/test-api-task"])
     error_message = "iam:PassRole must be limited to the service roles."
   }
 
   assert {
-    condition = one([
+    condition = toset(tolist(one([
       for s in data.aws_iam_policy_document.deploy.statement : s.condition if contains(s.actions, "iam:PassRole")
-    ])[0].values == toset(["ecs-tasks.amazonaws.com"])
+    ]))[0].values) == toset(["ecs-tasks.amazonaws.com"])
     error_message = "Roles may only be passed to ECS tasks."
   }
 }
