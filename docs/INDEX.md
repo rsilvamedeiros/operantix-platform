@@ -132,6 +132,7 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/development/commits.md`
 - `docs/development/dependencies.md`
 - `docs/development/feature-flags.md`
+- `docs/development/getting-started.md`
 - `docs/development/git.md`
 - `docs/development/initial-commit.md`
 - `docs/development/nest.md`
@@ -227,6 +228,7 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/workflow/module-08-resilience-scale.md`
 - `docs/workflow/module-09-cloud-deployment.md`
 - `docs/workflow/module-10-advanced-platform.md`
+- `docs/workflow/module-11-web-foundation.md`
 - `docs/workflow/module-protocol.md`
 - `docs/workflow/roadmap-phases.md`
 

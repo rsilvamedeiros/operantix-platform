@@ -25,6 +25,12 @@ describe('loadConfig', () => {
     );
   });
 
+  it('treats the blank AI service variables of .env.example as unset', () => {
+    const config = loadConfig({ ...required, AI_SERVICE_URL: '', AI_SERVICE_TOKEN: '' });
+
+    expect(config.ai).toBeUndefined();
+  });
+
   it('applies defaults', () => {
     const config = loadConfig(required);
 

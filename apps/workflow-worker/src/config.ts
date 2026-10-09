@@ -69,8 +69,17 @@ export class ConfigValidationError extends Error {
   override name = 'ConfigValidationError';
 }
 
+/** `.env.example` ships these blank; a blank value means unset, as it does for the AI service. */
+const BLANK_IS_UNSET = ['AI_SERVICE_URL', 'AI_SERVICE_TOKEN'] as const;
+
 export function loadConfig(env: Record<string, string | undefined>): WorkerConfig {
-  const parsed = EnvSchema.safeParse(env);
+  const parsed = EnvSchema.safeParse(
+    Object.fromEntries(
+      Object.entries(env).filter(
+        ([key, value]) => !(value === '' && (BLANK_IS_UNSET as readonly string[]).includes(key)),
+      ),
+    ),
+  );
   if (!parsed.success) {
     // Only variable names and rule messages: values may be secrets.
     const problems = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.code}`);
