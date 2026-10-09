@@ -12,7 +12,7 @@ locals {
   secret_arns  = distinct([for arn in values(var.secrets) : join(":", slice(split(":", arn), 0, 7))])
   cluster_name = element(split("/", var.cluster_arn), 1)
   scaling      = var.run_as_service && var.max_count != null
-  discovery    = var.service_discovery_namespace_id != null
+  discovery    = var.discovery_name != null
 
   container = merge(
     {
@@ -83,7 +83,7 @@ resource "aws_iam_role_policy_attachment" "execution" {
 }
 
 data "aws_iam_policy_document" "read_secrets" {
-  count = length(local.secret_arns) > 0 ? 1 : 0
+  count = length(var.secrets) > 0 ? 1 : 0
 
   statement {
     actions   = ["secretsmanager:GetSecretValue"]
@@ -92,7 +92,7 @@ data "aws_iam_policy_document" "read_secrets" {
 }
 
 resource "aws_iam_role_policy" "read_secrets" {
-  count = length(local.secret_arns) > 0 ? 1 : 0
+  count = length(var.secrets) > 0 ? 1 : 0
 
   name   = "read-own-secrets"
   role   = aws_iam_role.execution.id
