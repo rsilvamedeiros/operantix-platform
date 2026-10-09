@@ -14,7 +14,8 @@ export interface NavItem {
   href: string;
 }
 
-export type LinkComponent = ComponentType<AnchorHTMLAttributes<HTMLAnchorElement>>;
+export type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: string };
+export type LinkComponent = ComponentType<LinkProps>;
 
 export interface AppShellProps {
   brand: string;
