@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '../database';
 import { executionJobs } from '../engine.schema';
 
@@ -62,6 +62,24 @@ export class JobQueue {
       attempts: row.attempts,
       maxAttempts: row.max_attempts,
     }));
+  }
+
+  /**
+   * Renews this worker's lease on the given jobs and returns the ones it still holds. A job
+   * another worker claimed after the lease lapsed is no longer ours and is left out. Matching on
+   * `locked_by` rather than the expiry lets a briefly lapsed lease be recovered while nobody
+   * else has claimed the job.
+   */
+  async extend(jobIds: string[]): Promise<string[]> {
+    if (jobIds.length === 0) return [];
+    const rows = await this.db
+      .update(executionJobs)
+      .set({ lockedUntil: sql`now() + make_interval(secs => ${this.options.leaseSeconds})` })
+      .where(
+        and(inArray(executionJobs.id, jobIds), eq(executionJobs.lockedBy, this.options.workerId)),
+      )
+      .returning({ id: executionJobs.id });
+    return rows.map((row) => row.id);
   }
 
   /** Due jobs no live lease holds, across tenants (the worker role reads the whole queue). */

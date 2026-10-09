@@ -39,6 +39,7 @@ Validada na inicialização (`src/config.ts`); variável inválida derruba o pro
 
 1. **Claim** (`src/queue/job-queue.ts`): um único `UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP LOCKED)` faz lease de até `WORKER_BATCH_SIZE` jobs vencidos (`run_after <= now()`) e sem lease ativo, e incrementa `attempts`. Workers concorrentes recebem lotes disjuntos.
 2. **Run** (`src/execution/execution-runner.ts`): tudo dentro de `withTenant` com a organização do job. A execução vai de `PENDING` para `RUNNING`, cada step roda em ordem e o resultado é commitado antes do próximo. Steps já `SUCCEEDED` são pulados, então um worker que morre no meio deixa um estado retomável.
+   - **Renovação do lease** (ADR-0034): o lote inteiro é arrendado no claim, mas roda em sequência. Enquanto o lote está em andamento, os leases dos jobs ainda não terminados são renovados a cada `WORKER_LEASE_SECONDS / 3`, e antes de cada job o worker confere que ainda o detém; um job cujo lease passou para outro worker é pulado.
 3. **Complete**: quando a execução chega a um estado final, o job é apagado. Se o run lança (ex.: banco caiu), o job fica com o lease, que expira, e outro claim tenta de novo.
 
 Cada mudança de estado grava um evento em `execution_events` na mesma transação; a API expõe isso como timeline (`GET .../executions/{id}/timeline`, ver o README do `platform-api`).

@@ -228,7 +228,7 @@ describe('outbox relay', () => {
     await new WorkerLoop(
       new JobQueue(db, { workerId: 'relay-e2e', leaseSeconds: 30 }),
       new ExecutionRunner(db, new StepDispatcher([new LogStep()])),
-      { batchSize: 10, pollIntervalMs: 10 },
+      { batchSize: 10, pollIntervalMs: 10, leaseHeartbeatMs: 10_000 },
     ).tick();
 
     expect(await newRelay().tick()).toBe(4);

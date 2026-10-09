@@ -74,6 +74,7 @@ describe('workflow worker against PostgreSQL', () => {
     loop = new WorkerLoop(queue, runner, {
       batchSize: 10,
       pollIntervalMs: 10,
+      leaseHeartbeatMs: 10_000,
     });
   });
 
@@ -700,6 +701,114 @@ describe('workflow worker against PostgreSQL', () => {
       expect(first).toMatchObject({ executionId: seeded.executionId, attempts: 1 });
       expect(whileLeased).toEqual([]);
       expect(afterExpiry).toMatchObject([{ executionId: seeded.executionId, attempts: 2 }]);
+    });
+
+    describe('a batch that outlasts its lease', () => {
+      const leaseSeconds = 1;
+
+      /** A worker whose first job holds it for `holdMs`; counts how often each job's step ran. */
+      const run = async (heartbeatMs: number, holdMs: number) => {
+        const runs = new Map<string, number>();
+        const db = createDatabase(database.worker);
+        const mine = new JobQueue(db, { workerId: 'worker-slow', leaseSeconds });
+        const other = new JobQueue(createDatabase(database.worker), {
+          workerId: 'worker-other',
+          leaseSeconds,
+        });
+        const runner = new ExecutionRunner(
+          db,
+          new StepDispatcher([
+            {
+              type: 'track',
+              run: async (step) => {
+                runs.set(step.id, (runs.get(step.id) ?? 0) + 1);
+                if (step.id === 'first') await new Promise((r) => setTimeout(r, holdMs));
+                return null;
+              },
+            },
+          ]),
+        );
+        const track = (id: string): WorkflowStep => ({ id, name: id, type: 'track', config: {} });
+        for (const id of ['first', 'second', 'third']) {
+          await database.seedExecution([track(id)]);
+        }
+        const loop = new WorkerLoop(mine, runner, {
+          batchSize: 3,
+          pollIntervalMs: 10,
+          leaseHeartbeatMs: heartbeatMs,
+        });
+        // The other worker polls while the first one is busy with the first job.
+        const ticking = loop.tick();
+        const stolen: string[] = [];
+        const deadline = Date.now() + holdMs;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 100));
+          stolen.push(...(await other.claim(3)).map((job) => job.executionId));
+        }
+        await ticking;
+        return { runs, stolen };
+      };
+
+      it('keeps the queued jobs of a slow batch away from other workers', async () => {
+        const { runs, stolen } = await run(250, 2_500);
+
+        expect(stolen).toEqual([]);
+        expect([...runs.values()]).toEqual([1, 1, 1]);
+      });
+
+      it('would otherwise hand them to another worker (the race this guards against)', async () => {
+        const { stolen } = await run(60_000, 2_500);
+
+        expect(stolen.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('extends only the leases this worker still holds', async () => {
+      const mine = await database.seedExecution([log('x')]);
+      const theirs = await database.seedExecution([log('x')]);
+      const other = new JobQueue(createDatabase(database.worker), {
+        workerId: 'worker-other',
+        leaseSeconds: 30,
+      });
+      await queue.claim(1);
+      await other.claim(1);
+      const claimed = await database.owner.query<{ id: string; locked_by: string }>(
+        'SELECT id, locked_by FROM execution_jobs WHERE id = ANY($1)',
+        [[mine.jobId, theirs.jobId]],
+      );
+      const myJob = claimed.rows.find((row) => row.locked_by === 'worker-test')?.id ?? '';
+      const theirJob = claimed.rows.find((row) => row.locked_by === 'worker-other')?.id ?? '';
+      await database.owner.query(
+        `UPDATE execution_jobs SET locked_until = now() + interval '1 second' WHERE id = ANY($1)`,
+        [[myJob, theirJob]],
+      );
+
+      const held = await queue.extend([myJob, theirJob]);
+
+      expect(held).toEqual([myJob]);
+      const { rows } = await database.owner.query<{ id: string; secs: number }>(
+        `SELECT id, extract(epoch FROM locked_until - now())::float8 AS secs
+           FROM execution_jobs WHERE id = ANY($1)`,
+        [[myJob, theirJob]],
+      );
+      expect(rows.find((r) => r.id === myJob)?.secs).toBeGreaterThan(20);
+      expect(rows.find((r) => r.id === theirJob)?.secs).toBeLessThan(5);
+    });
+
+    it('extends the lease of a job whose lease lapsed, if nobody else claimed it', async () => {
+      const seeded = await database.seedExecution([log('x')]);
+      await queue.claim(1);
+      await database.owner.query(
+        `UPDATE execution_jobs SET locked_until = now() - interval '5 seconds' WHERE id = $1`,
+        [seeded.jobId],
+      );
+
+      expect(await queue.extend([seeded.jobId])).toEqual([seeded.jobId]);
+      expect(await queue.claim(1)).toEqual([]);
+    });
+
+    it('extends nothing for an empty list', async () => {
+      expect(await queue.extend([])).toEqual([]);
     });
 
     it('does not claim a job before its run_after', async () => {
