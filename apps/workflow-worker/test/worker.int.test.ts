@@ -702,6 +702,54 @@ describe('workflow worker against PostgreSQL', () => {
       expect(afterExpiry).toMatchObject([{ executionId: seeded.executionId, attempts: 2 }]);
     });
 
+    it('extends only the leases this worker still holds', async () => {
+      const mine = await database.seedExecution([log('x')]);
+      const theirs = await database.seedExecution([log('x')]);
+      const other = new JobQueue(createDatabase(database.worker), {
+        workerId: 'worker-other',
+        leaseSeconds: 30,
+      });
+      await queue.claim(1);
+      await other.claim(1);
+      const claimed = await database.owner.query<{ id: string; locked_by: string }>(
+        'SELECT id, locked_by FROM execution_jobs WHERE id = ANY($1)',
+        [[mine.jobId, theirs.jobId]],
+      );
+      const myJob = claimed.rows.find((row) => row.locked_by === 'worker-test')?.id ?? '';
+      const theirJob = claimed.rows.find((row) => row.locked_by === 'worker-other')?.id ?? '';
+      await database.owner.query(
+        `UPDATE execution_jobs SET locked_until = now() + interval '1 second' WHERE id = ANY($1)`,
+        [[myJob, theirJob]],
+      );
+
+      const held = await queue.extend([myJob, theirJob]);
+
+      expect(held).toEqual([myJob]);
+      const { rows } = await database.owner.query<{ id: string; secs: number }>(
+        `SELECT id, extract(epoch FROM locked_until - now())::float8 AS secs
+           FROM execution_jobs WHERE id = ANY($1)`,
+        [[myJob, theirJob]],
+      );
+      expect(rows.find((r) => r.id === myJob)?.secs).toBeGreaterThan(20);
+      expect(rows.find((r) => r.id === theirJob)?.secs).toBeLessThan(5);
+    });
+
+    it('extends the lease of a job whose lease lapsed, if nobody else claimed it', async () => {
+      const seeded = await database.seedExecution([log('x')]);
+      await queue.claim(1);
+      await database.owner.query(
+        `UPDATE execution_jobs SET locked_until = now() - interval '5 seconds' WHERE id = $1`,
+        [seeded.jobId],
+      );
+
+      expect(await queue.extend([seeded.jobId])).toEqual([seeded.jobId]);
+      expect(await queue.claim(1)).toEqual([]);
+    });
+
+    it('extends nothing for an empty list', async () => {
+      expect(await queue.extend([])).toEqual([]);
+    });
+
     it('does not claim a job before its run_after', async () => {
       const seeded = await database.seedExecution([log('x')]);
       await database.owner.query(

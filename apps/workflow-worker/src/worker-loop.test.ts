@@ -10,12 +10,14 @@ const job = (id: string): ClaimedJob => ({
   maxAttempts: 5,
 });
 
-const options = { batchSize: 2, pollIntervalMs: 10 };
+const options = { batchSize: 2, pollIntervalMs: 10, leaseHeartbeatMs: 20 };
 
 function fakes(batches: ClaimedJob[][]) {
   const queue = {
     claim: vi.fn((_limit: number) => Promise.resolve(batches.shift() ?? [])),
     complete: vi.fn((_id: string) => Promise.resolve()),
+    // By default every lease is still held.
+    extend: vi.fn((ids: string[]) => Promise.resolve(ids)),
   } satisfies JobSource;
   const runner = {
     run: vi.fn((_job: ClaimedJob) => Promise.resolve('SUCCEEDED' as const)),
@@ -44,6 +46,62 @@ describe('WorkerLoop', () => {
     await loop.tick();
 
     expect(queue.complete.mock.calls).toEqual([['b']]);
+  });
+
+  it('renews the leases of the whole batch while a long job runs, and stops when the batch ends', async () => {
+    const { queue, runner } = fakes([[job('a'), job('b')]]);
+    let finish: () => void = () => undefined;
+    runner.run.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = () => {
+            resolve('SUCCEEDED');
+          };
+        }),
+    );
+    const loop = new WorkerLoop(queue, runner, options);
+
+    const ticking = loop.tick();
+    await vi.waitFor(() => {
+      // The check before job `a` ran, then at least one heartbeat during it.
+      expect(queue.extend.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(queue.extend).toHaveBeenLastCalledWith(['a', 'b']);
+    finish();
+    await ticking;
+    const renewals = queue.extend.mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(queue.extend.mock.calls.length).toBe(renewals);
+  });
+
+  it('does not run a job whose lease another worker took before its turn', async () => {
+    const { queue, runner } = fakes([[job('a'), job('b')]]);
+    queue.extend.mockImplementation((ids: string[]) =>
+      Promise.resolve(ids.filter((id) => id !== 'b')),
+    );
+    const loop = new WorkerLoop(queue, runner, options);
+
+    await loop.tick();
+
+    expect(runner.run.mock.calls.map(([j]) => j.id)).toEqual(['a']);
+    expect(queue.complete.mock.calls).toEqual([['a']]);
+  });
+
+  it('keeps running the batch when a heartbeat fails', async () => {
+    const { queue, runner } = fakes([[job('a')]]);
+    runner.run.mockImplementationOnce(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      return 'SUCCEEDED' as const;
+    });
+    queue.extend
+      .mockImplementationOnce((ids: string[]) => Promise.resolve(ids))
+      .mockRejectedValue(new Error('database went away'));
+    const loop = new WorkerLoop(queue, runner, options);
+
+    await loop.tick();
+
+    expect(queue.complete).toHaveBeenCalledWith('a');
   });
 
   it('polls until stopped, and stop waits for the batch in flight', async () => {
