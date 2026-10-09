@@ -1,0 +1,20 @@
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  // The UI package ships TypeScript source; Next compiles it with the app.
+  transpilePackages: ['@operantix/ui'],
+  poweredByHeader: false,
+  headers: () =>
+    Promise.resolve([
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+        ],
+      },
+    ]),
+};
+
+export default nextConfig;
