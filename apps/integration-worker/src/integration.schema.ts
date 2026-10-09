@@ -15,6 +15,7 @@ export const webhookEndpoints = pgTable('webhook_endpoints', {
   status: text('status', { enum: ['ACTIVE', 'DISABLED'] }).notNull(),
   signingSecretId: uuid('signing_secret_id').notNull(),
   consecutiveFailures: integer('consecutive_failures').notNull(),
+  circuitOpenUntil: timestamp('circuit_open_until', { withTimezone: true }),
 });
 
 export const secrets = pgTable('secrets', {

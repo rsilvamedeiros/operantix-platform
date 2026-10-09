@@ -204,6 +204,13 @@
       "when": 1791474250365,
       "tag": "0028_worker_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791516195682,
+      "tag": "0029_webhook_circuit_breaker",
+      "breakpoints": true
     }
   ]
 }

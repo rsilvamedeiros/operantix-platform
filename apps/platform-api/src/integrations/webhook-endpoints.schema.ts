@@ -26,6 +26,9 @@ export const webhookEndpoints = pgTable(
     // Failed delivery attempts since the last success; the integration worker disables the
     // endpoint when it reaches its threshold (ADR-0023).
     consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+    // While in the future, the integration worker does not call the endpoint: its circuit breaker
+    // is open (ADR-0032). Cleared by the first success.
+    circuitOpenUntil: timestamp('circuit_open_until', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
