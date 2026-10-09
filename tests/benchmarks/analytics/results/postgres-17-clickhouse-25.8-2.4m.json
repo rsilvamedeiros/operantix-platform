@@ -1,0 +1,285 @@
+{
+  "python": "3.13.16",
+  "executions": 400000,
+  "organizations": 30,
+  "days": 90,
+  "repeats": 9,
+  "load": {
+    "postgres_copy_s": 15.9,
+    "clickhouse_insert_s": 2.2,
+    "postgres_tenant_index_s": 3.5,
+    "postgres_rollup_build_s": 3.4,
+    "postgres_rollup_refresh_last_day_s": 0.2
+  },
+  "sizes_mb": {
+    "postgres_execution_events": 647.4,
+    "postgres_execution_event_hourly": 91.4,
+    "postgres_tenant_time_index": 226.9,
+    "clickhouse_execution_events": 23.2
+  },
+  "runs": [
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "largest",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
+      "median_ms": 84.5,
+      "max_ms": 89.6
+    },
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "largest",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
+      "median_ms": 65.5,
+      "max_ms": 72.6
+    },
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "largest",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "plan": [
+        "Aggregate",
+        "Sort",
+        "Subquery Scan",
+        "Aggregate",
+        "Gather Merge",
+        "Aggregate",
+        "Sort",
+        "Seq Scan"
+      ],
+      "median_ms": 163.0,
+      "max_ms": 174.1
+    },
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "median",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
+      "median_ms": 85.4,
+      "max_ms": 92.5
+    },
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "median",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
+      "median_ms": 78.5,
+      "max_ms": 87.7
+    },
+    {
+      "engine": "postgres",
+      "variant": "existing-index-only",
+      "tenant": "median",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "plan": [
+        "Aggregate",
+        "Sort",
+        "Subquery Scan",
+        "Aggregate",
+        "Gather Merge",
+        "Aggregate",
+        "Sort",
+        "Seq Scan"
+      ],
+      "median_ms": 80.2,
+      "max_ms": 86.1
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "largest",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Aggregate", "Sort", "Index Only Scan"],
+      "median_ms": 47.6,
+      "max_ms": 52.9
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "largest",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Sort", "Aggregate", "Index Only Scan"],
+      "median_ms": 8.1,
+      "max_ms": 9.6
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "largest",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "plan": ["Aggregate", "Sort", "Subquery Scan", "Aggregate", "Index Only Scan"],
+      "median_ms": 93.5,
+      "max_ms": 96.9
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "median",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Aggregate", "Sort", "Index Only Scan"],
+      "median_ms": 3.1,
+      "max_ms": 3.5
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "median",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Sort", "Aggregate", "Index Only Scan"],
+      "median_ms": 0.7,
+      "max_ms": 0.9
+    },
+    {
+      "engine": "postgres",
+      "variant": "tenant-time-index",
+      "tenant": "median",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "plan": ["Aggregate", "Sort", "Subquery Scan", "Aggregate", "Index Only Scan"],
+      "median_ms": 5.6,
+      "max_ms": 6.2
+    },
+    {
+      "engine": "postgres",
+      "variant": "hourly-rollup",
+      "tenant": "largest",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
+      "median_ms": 5.0,
+      "max_ms": 5.3
+    },
+    {
+      "engine": "postgres",
+      "variant": "hourly-rollup",
+      "tenant": "largest",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
+      "median_ms": 1.6,
+      "max_ms": 1.8
+    },
+    {
+      "engine": "postgres",
+      "variant": "hourly-rollup",
+      "tenant": "median",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
+      "median_ms": 2.9,
+      "max_ms": 3.0
+    },
+    {
+      "engine": "postgres",
+      "variant": "hourly-rollup",
+      "tenant": "median",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
+      "median_ms": 1.0,
+      "max_ms": 1.3
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "largest",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "median_ms": 7.7,
+      "max_ms": 8.2
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "largest",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "median_ms": 6.6,
+      "max_ms": 7.0
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "largest",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "median_ms": 17.9,
+      "max_ms": 21.9
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "median",
+      "query": "daily_outcomes",
+      "correct": true,
+      "rows": 60,
+      "median_ms": 5.6,
+      "max_ms": 5.8
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "median",
+      "query": "step_failures",
+      "correct": true,
+      "rows": 3,
+      "median_ms": 5.2,
+      "max_ms": 5.5
+    },
+    {
+      "engine": "clickhouse",
+      "variant": "mergetree-org-time",
+      "tenant": "median",
+      "query": "duration_percentiles",
+      "correct": true,
+      "rows": 30,
+      "median_ms": 7.9,
+      "max_ms": 8.3
+    }
+  ],
+  "tenants": {
+    "largest": {
+      "events": 589948
+    },
+    "median": {
+      "events": 36776
+    }
+  },
+  "rows": 2355088
+}
