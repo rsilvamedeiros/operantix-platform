@@ -19,6 +19,16 @@ export default defineConfig({
           testTimeout: 30_000,
         },
       },
+      {
+        // Reference load scenarios; not part of CI (`pnpm test:load`).
+        extends: true,
+        test: {
+          name: 'load',
+          include: ['test/load/**/*.load.test.ts'],
+          hookTimeout: 120_000,
+          testTimeout: 300_000,
+        },
+      },
     ],
     coverage: {
       provider: 'v8',

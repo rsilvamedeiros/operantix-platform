@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:coverage": "vitest run --coverage"
+    "test:load": "vitest run --project load --disableConsoleIntercept",
+    "test:coverage": "vitest run --coverage --project unit --project integration"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",
