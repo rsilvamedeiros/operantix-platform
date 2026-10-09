@@ -25,13 +25,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Aggregate",
-        "Gather Merge",
-        "Aggregate",
-        "Sort",
-        "Seq Scan"
-      ],
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
       "median_ms": 84.5,
       "max_ms": 89.6
     },
@@ -42,13 +36,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Aggregate",
-        "Gather Merge",
-        "Aggregate",
-        "Sort",
-        "Seq Scan"
-      ],
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
       "median_ms": 65.5,
       "max_ms": 72.6
     },
@@ -79,13 +67,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Aggregate",
-        "Gather Merge",
-        "Aggregate",
-        "Sort",
-        "Seq Scan"
-      ],
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
       "median_ms": 85.4,
       "max_ms": 92.5
     },
@@ -96,13 +78,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Aggregate",
-        "Gather Merge",
-        "Aggregate",
-        "Sort",
-        "Seq Scan"
-      ],
+      "plan": ["Aggregate", "Gather Merge", "Aggregate", "Sort", "Seq Scan"],
       "median_ms": 78.5,
       "max_ms": 87.7
     },
@@ -133,11 +109,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Aggregate",
-        "Sort",
-        "Index Only Scan"
-      ],
+      "plan": ["Aggregate", "Sort", "Index Only Scan"],
       "median_ms": 47.6,
       "max_ms": 52.9
     },
@@ -148,11 +120,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Index Only Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Index Only Scan"],
       "median_ms": 8.1,
       "max_ms": 9.6
     },
@@ -163,13 +131,7 @@
       "query": "duration_percentiles",
       "correct": true,
       "rows": 30,
-      "plan": [
-        "Aggregate",
-        "Sort",
-        "Subquery Scan",
-        "Aggregate",
-        "Index Only Scan"
-      ],
+      "plan": ["Aggregate", "Sort", "Subquery Scan", "Aggregate", "Index Only Scan"],
       "median_ms": 93.5,
       "max_ms": 96.9
     },
@@ -180,11 +142,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Aggregate",
-        "Sort",
-        "Index Only Scan"
-      ],
+      "plan": ["Aggregate", "Sort", "Index Only Scan"],
       "median_ms": 3.1,
       "max_ms": 3.5
     },
@@ -195,11 +153,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Index Only Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Index Only Scan"],
       "median_ms": 0.7,
       "max_ms": 0.9
     },
@@ -210,13 +164,7 @@
       "query": "duration_percentiles",
       "correct": true,
       "rows": 30,
-      "plan": [
-        "Aggregate",
-        "Sort",
-        "Subquery Scan",
-        "Aggregate",
-        "Index Only Scan"
-      ],
+      "plan": ["Aggregate", "Sort", "Subquery Scan", "Aggregate", "Index Only Scan"],
       "median_ms": 5.6,
       "max_ms": 6.2
     },
@@ -227,12 +175,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "median_ms": 5.0,
       "max_ms": 5.3
     },
@@ -243,12 +186,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "median_ms": 1.6,
       "max_ms": 1.8
     },
@@ -259,12 +197,7 @@
       "query": "daily_outcomes",
       "correct": true,
       "rows": 60,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "median_ms": 2.9,
       "max_ms": 3.0
     },
@@ -275,12 +208,7 @@
       "query": "step_failures",
       "correct": true,
       "rows": 3,
-      "plan": [
-        "Sort",
-        "Aggregate",
-        "Bitmap Heap Scan",
-        "Bitmap Index Scan"
-      ],
+      "plan": ["Sort", "Aggregate", "Bitmap Heap Scan", "Bitmap Index Scan"],
       "median_ms": 1.0,
       "max_ms": 1.3
     },
