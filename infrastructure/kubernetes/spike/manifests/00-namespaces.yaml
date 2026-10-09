@@ -1,0 +1,17 @@
+# Workloads live in a namespace that enforces the "restricted" Pod Security Standard, so a pod
+# that is not hardened is rejected at admission. Local stand-ins for managed services (RDS,
+# ElastiCache) live apart, because the stock images run as root.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: operantix
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: operantix-deps
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
