@@ -16,6 +16,13 @@ export interface JobQueueOptions {
   leaseSeconds: number;
 }
 
+/** Jobs due and waiting for a worker, the scaling signal for the worker deployment. */
+export interface QueueBacklog {
+  waiting: number;
+  /** Seconds the longest-waiting job has been due; 0 when nothing waits. */
+  oldestWaitingSeconds: number;
+}
+
 /**
  * The execution_jobs queue (ADR-0018). Claims are a single statement: the inner SELECT locks
  * due, unleased rows and skips rows another worker is claiming, so concurrent workers get
@@ -55,6 +62,19 @@ export class JobQueue {
       attempts: row.attempts,
       maxAttempts: row.max_attempts,
     }));
+  }
+
+  /** Due jobs no live lease holds, across tenants (the worker role reads the whole queue). */
+  async backlog(): Promise<QueueBacklog> {
+    const { rows } = await this.db.execute<{ waiting: string; oldest: number | null }>(sql`
+      SELECT count(*) AS waiting,
+             extract(epoch FROM now() - min(run_after))::float8 AS oldest
+      FROM execution_jobs
+      WHERE run_after <= now() AND (locked_until IS NULL OR locked_until < now())`);
+    return {
+      waiting: Number(rows[0]?.waiting ?? 0),
+      oldestWaitingSeconds: Math.max(0, rows[0]?.oldest ?? 0),
+    };
   }
 
   /** Removes a job whose execution reached a terminal state. */
