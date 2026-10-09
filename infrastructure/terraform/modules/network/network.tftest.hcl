@@ -1,6 +1,25 @@
 # Plan-level properties of the network, checked against a mocked AWS provider (no credentials).
 
-mock_provider "aws" {}
+mock_provider "aws" {
+  # The mock would otherwise return random strings where AWS expects ARNs and JSON.
+  mock_resource "aws_cloudwatch_log_group" {
+    defaults = {
+      arn = "arn:aws:logs:eu-west-1:123456789012:log-group:/test/vpc-flow"
+    }
+  }
+
+  mock_resource "aws_iam_role" {
+    defaults = {
+      arn = "arn:aws:iam::123456789012:role/test-vpc-flow"
+    }
+  }
+
+  mock_data "aws_iam_policy_document" {
+    defaults = {
+      json = "{\"Version\":\"2012-10-17\",\"Statement\":[]}"
+    }
+  }
+}
 
 variables {
   name = "test"
@@ -85,7 +104,7 @@ run "databases_accept_traffic_only_from_workloads" {
   }
 
   assert {
-    condition     = length(aws_vpc_security_group_egress_rule.data) == 0
+    condition     = length(aws_security_group.data.egress) == 0
     error_message = "The data security group must have no egress rules."
   }
 }
