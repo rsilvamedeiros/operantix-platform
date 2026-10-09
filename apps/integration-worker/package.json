@@ -26,6 +26,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@opentelemetry/sdk-metrics": "^2.12.0",
     "@operantix/testing": "workspace:*",
     "@swc/core": "^1.16.13",
     "@testcontainers/postgresql": "^12.2.0",

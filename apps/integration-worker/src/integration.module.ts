@@ -11,6 +11,7 @@ import { KafkaEventConsumer, KafkaEventPublisher, PollingLoop } from '@operantix
 import { Pool } from 'pg';
 import type { IntegrationConfig } from './config';
 import { createDatabase } from './database';
+import { registerDeliveryGauges } from './webhooks/backlog-metrics';
 import { WebhookDispatcher } from './webhooks/webhook-dispatcher';
 import { WebhookFanOut } from './webhooks/webhook-fan-out';
 
@@ -118,6 +119,7 @@ export class IntegrationModule {
               http: config.http,
               keyring: config.secrets.keyring,
             });
+            registerDeliveryGauges(dispatcher);
             return new PollingLoop(
               () => dispatcher.tick(),
               config.delivery,
