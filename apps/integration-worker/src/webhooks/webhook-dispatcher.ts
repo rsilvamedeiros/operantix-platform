@@ -48,6 +48,13 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Deliveries due and waiting for a dispatcher, the scaling signal for the worker. */
+export interface DeliveryBacklog {
+  waiting: number;
+  /** Seconds the longest-waiting due delivery has waited; 0 when nothing waits. */
+  oldestWaitingSeconds: number;
+}
+
 /**
  * Delivers queued webhooks (ADR-0023). Each tick leases due deliveries of any tenant, then for
  * each one: reads the endpoint and opens its signing secret in the delivery's tenant, posts the
@@ -83,6 +90,23 @@ export class WebhookDispatcher {
       }
     }
     return claimed.length;
+  }
+
+  /**
+   * Due, unleased deliveries across tenants. Deliveries a circuit defers are scheduled for later,
+   * so a dead destination does not read as load.
+   */
+  async backlog(): Promise<DeliveryBacklog> {
+    const { rows } = await this.db.execute<{ waiting: string; oldest: number | null }>(sql`
+      SELECT count(*) AS waiting,
+             extract(epoch FROM now() - min(next_attempt_at))::float8 AS oldest
+      FROM webhook_deliveries
+      WHERE status = 'PENDING' AND next_attempt_at <= now()
+        AND (lease_expires_at IS NULL OR lease_expires_at < now())`);
+    return {
+      waiting: Number(rows[0]?.waiting ?? 0),
+      oldestWaitingSeconds: Math.max(0, rows[0]?.oldest ?? 0),
+    };
   }
 
   private async claim(): Promise<ClaimedDelivery[]> {
