@@ -17,8 +17,9 @@ describe('PlatformStatusCard', () => {
     );
 
     expect(screen.getByText('Degraded')).toBeInTheDocument();
-    expect(screen.getByRole('listitem', { name: /postgres/i })).toHaveTextContent('Up');
-    expect(screen.getByRole('listitem', { name: /redis/i })).toHaveTextContent('Down');
+    const [postgres, redis] = screen.getAllByRole('listitem');
+    expect(postgres).toHaveTextContent(/postgres\s*Up/);
+    expect(redis).toHaveTextContent(/redis\s*Down/);
   });
 
   it('says so, without detail, when the API cannot be reached', () => {
