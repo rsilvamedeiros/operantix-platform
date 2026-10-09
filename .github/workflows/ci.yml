@@ -99,3 +99,35 @@ jobs:
 
       - name: Test with coverage
         run: uv run pytest --cov
+
+  images:
+    name: Container image (${{ matrix.image }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: platform-api
+            dockerfile: Dockerfile.node
+            context: .
+            args: --build-arg APP=platform-api
+          - image: workflow-worker
+            dockerfile: Dockerfile.node
+            context: .
+            args: --build-arg APP=workflow-worker
+          - image: integration-worker
+            dockerfile: Dockerfile.node
+            context: .
+            args: --build-arg APP=integration-worker
+          - image: ai-service
+            dockerfile: services/ai-service/Dockerfile
+            context: services/ai-service
+            args: ''
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Builds only; nothing is pushed until the deploy pipeline exists (ADR-0035).
+      - name: Build
+        run: docker build -f ${{ matrix.dockerfile }} ${{ matrix.args }} -t operantix/${{ matrix.image }}:ci ${{ matrix.context }}

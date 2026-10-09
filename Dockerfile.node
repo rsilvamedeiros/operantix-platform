@@ -1,0 +1,25 @@
+# syntax=docker/dockerfile:1
+# One image recipe for the three Node workloads (ADR-0035). Build with the workload's package name:
+#   docker build -f Dockerfile.node --build-arg APP=platform-api -t operantix/platform-api .
+# The relay is the same image as workflow-worker, started with `node dist/relay-main.js`.
+ARG NODE_VERSION=22
+
+FROM node:${NODE_VERSION}-bookworm-slim AS build
+ARG APP
+ENV PNPM_HOME=/pnpm
+ENV PATH=/pnpm:$PATH
+RUN corepack enable
+WORKDIR /repo
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+RUN pnpm turbo run build --filter=@operantix/${APP}...
+# A self-contained directory: the app, its built workspace packages and production dependencies.
+RUN pnpm --filter @operantix/${APP} --prod deploy --legacy /out \
+ && rm -rf /out/src /out/test /out/coverage
+
+FROM node:${NODE_VERSION}-bookworm-slim AS runtime
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /out /app
+USER node
+CMD ["node", "--enable-source-maps", "dist/main.js"]

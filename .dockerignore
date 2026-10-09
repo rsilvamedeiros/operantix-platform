@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/coverage
+**/.turbo
+**/.venv
+**/__pycache__
+.git
+.github
+docs
+infrastructure
+tests
+*.md
+!apps/platform-api/README.md
