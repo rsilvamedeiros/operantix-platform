@@ -703,6 +703,66 @@ describe('workflow worker against PostgreSQL', () => {
       expect(afterExpiry).toMatchObject([{ executionId: seeded.executionId, attempts: 2 }]);
     });
 
+    describe('a batch that outlasts its lease', () => {
+      const leaseSeconds = 1;
+
+      /** A worker whose first job holds it for `holdMs`; counts how often each job's step ran. */
+      const run = async (heartbeatMs: number, holdMs: number) => {
+        const runs = new Map<string, number>();
+        const db = createDatabase(database.worker);
+        const mine = new JobQueue(db, { workerId: 'worker-slow', leaseSeconds });
+        const other = new JobQueue(createDatabase(database.worker), {
+          workerId: 'worker-other',
+          leaseSeconds,
+        });
+        const runner = new ExecutionRunner(
+          db,
+          new StepDispatcher([
+            {
+              type: 'track',
+              run: async (step) => {
+                runs.set(step.id, (runs.get(step.id) ?? 0) + 1);
+                if (step.id === 'first') await new Promise((r) => setTimeout(r, holdMs));
+                return null;
+              },
+            },
+          ]),
+        );
+        const track = (id: string): WorkflowStep => ({ id, name: id, type: 'track', config: {} });
+        for (const id of ['first', 'second', 'third']) {
+          await database.seedExecution([track(id)]);
+        }
+        const loop = new WorkerLoop(mine, runner, {
+          batchSize: 3,
+          pollIntervalMs: 10,
+          leaseHeartbeatMs: heartbeatMs,
+        });
+        // The other worker polls while the first one is busy with the first job.
+        const ticking = loop.tick();
+        const stolen: string[] = [];
+        const deadline = Date.now() + holdMs;
+        while (Date.now() < deadline) {
+          await new Promise((r) => setTimeout(r, 100));
+          stolen.push(...(await other.claim(3)).map((job) => job.executionId));
+        }
+        await ticking;
+        return { runs, stolen };
+      };
+
+      it('keeps the queued jobs of a slow batch away from other workers', async () => {
+        const { runs, stolen } = await run(250, 2_500);
+
+        expect(stolen).toEqual([]);
+        expect([...runs.values()]).toEqual([1, 1, 1]);
+      });
+
+      it('would otherwise hand them to another worker (the race this guards against)', async () => {
+        const { stolen } = await run(60_000, 2_500);
+
+        expect(stolen.length).toBeGreaterThan(0);
+      });
+    });
+
     it('extends only the leases this worker still holds', async () => {
       const mine = await database.seedExecution([log('x')]);
       const theirs = await database.seedExecution([log('x')]);
