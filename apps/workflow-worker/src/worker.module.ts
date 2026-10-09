@@ -90,7 +90,11 @@ export class WorkerModule {
               new AiClassifyStep(config.ai ? new AiServiceClient(config.ai) : undefined),
             ]);
             const runner = new ExecutionRunner(db, dispatcher, config.retry);
-            return new WorkerLoop(queue, runner, config.queue);
+            return new WorkerLoop(queue, runner, {
+              ...config.queue,
+              // Three renewals per lease: one missed beat does not lose the lease.
+              leaseHeartbeatMs: Math.floor((config.queue.leaseSeconds * 1000) / 3),
+            });
           },
         },
         WorkerLifecycle,

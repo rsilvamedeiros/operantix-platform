@@ -74,6 +74,7 @@ describe('workflow worker against PostgreSQL', () => {
     loop = new WorkerLoop(queue, runner, {
       batchSize: 10,
       pollIntervalMs: 10,
+      leaseHeartbeatMs: 10_000,
     });
   });
 
