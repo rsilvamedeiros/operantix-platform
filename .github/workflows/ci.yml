@@ -17,6 +17,8 @@ jobs:
     name: TypeScript quality gates
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -44,6 +46,12 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Test ui with coverage
+        run: pnpm --filter @operantix/ui test:coverage
+
+      - name: Test web with coverage
+        run: pnpm --filter @operantix/web test:coverage
 
       - name: Test contracts with coverage
         run: pnpm --filter @operantix/contracts test:coverage

@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   // The UI package ships TypeScript source; Next compiles it with the app.
   transpilePackages: ['@operantix/ui'],
   poweredByHeader: false,
-  async headers() {
-    return [
+  headers: () =>
+    Promise.resolve([
       {
         source: '/(.*)',
         headers: [
@@ -14,8 +14,7 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         ],
       },
-    ];
-  },
+    ]),
 };
 
 export default nextConfig;

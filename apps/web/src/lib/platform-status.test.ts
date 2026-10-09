@@ -49,8 +49,8 @@ describe('fetchPlatformStatus', () => {
     ['a body without checks', respond(200, { status: 'ok' })],
     ['an unknown check state', respond(200, { checks: { postgres: 'maybe' } })],
   ])('reports unreachable on %s', async (_name, fetchImpl) => {
-    await expect(
-      fetchPlatformStatus({ baseUrl, fetch: fetchImpl as unknown as typeof fetch }),
-    ).resolves.toEqual({ state: 'unreachable' });
+    await expect(fetchPlatformStatus({ baseUrl, fetch: fetchImpl })).resolves.toEqual({
+      state: 'unreachable',
+    });
   });
 });

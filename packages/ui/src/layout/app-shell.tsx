@@ -1,12 +1,6 @@
 'use client';
 
-import {
-  type AnchorHTMLAttributes,
-  type ComponentType,
-  type ReactNode,
-  useRef,
-  useState,
-} from 'react';
+import { type ComponentType, type ReactNode, useRef, useState } from 'react';
 import { cn } from '../lib/cn';
 
 export interface NavItem {
@@ -14,7 +8,13 @@ export interface NavItem {
   href: string;
 }
 
-export type LinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & { href: string };
+/** What the shell passes to a link; small on purpose, so any router's link component fits. */
+export interface LinkProps {
+  href: string;
+  className?: string | undefined;
+  'aria-current'?: 'page' | undefined;
+  children: ReactNode;
+}
 export type LinkComponent = ComponentType<LinkProps>;
 
 export interface AppShellProps {

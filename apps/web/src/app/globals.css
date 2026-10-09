@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@operantix/ui/styles.css';
+
+/* Tailwind scans the UI package too, since its classes live in that source. */
+@source '../../../../packages/ui/src';

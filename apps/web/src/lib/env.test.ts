@@ -21,8 +21,6 @@ describe('apiBaseUrl', () => {
   });
 
   it('never repeats the rejected value', () => {
-    expect(() => apiBaseUrl({ API_BASE_URL: 'ftp://user:secret@api.test' })).not.toThrow(
-      /secret/,
-    );
+    expect(() => apiBaseUrl({ API_BASE_URL: 'ftp://user:secret@api.test' })).not.toThrow(/secret/);
   });
 });

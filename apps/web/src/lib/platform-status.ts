@@ -18,7 +18,7 @@ function parseChecks(body: unknown): Record<string, DependencyState> | null {
   const { checks } = body;
   if (typeof checks !== 'object' || checks === null) return null;
   const parsed: Record<string, DependencyState> = {};
-  for (const [name, state] of Object.entries(checks)) {
+  for (const [name, state] of Object.entries(checks as Record<string, unknown>)) {
     if (state !== 'up' && state !== 'down') return null;
     parsed[name] = state;
   }
