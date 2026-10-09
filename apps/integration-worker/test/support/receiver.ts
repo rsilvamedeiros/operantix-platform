@@ -12,6 +12,8 @@ export interface Receiver {
   received: Received[];
   /** The status each path answers with; 200 when unset. */
   statuses: Map<string, number>;
+  /** Holds the response to the next request received, on any path, for this many milliseconds. */
+  holdNext(ms: number): void;
   close(): Promise<void>;
 }
 
@@ -19,6 +21,7 @@ export interface Receiver {
 export async function startReceiver(): Promise<Receiver> {
   const received: Received[] = [];
   const statuses = new Map<string, number>();
+  let held = 0;
   const server: Server = createServer((req, res) => {
     let body = '';
     req.on('data', (chunk: Buffer) => (body += chunk.toString()));
@@ -26,7 +29,9 @@ export async function startReceiver(): Promise<Receiver> {
       const path = req.url ?? '/';
       received.push({ path, headers: req.headers, body });
       res.statusCode = statuses.get(path) ?? 200;
-      res.end();
+      const delay = held;
+      held = 0;
+      setTimeout(() => res.end(), delay);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -35,6 +40,9 @@ export async function startReceiver(): Promise<Receiver> {
     url: (path) => `${base}${path}`,
     received,
     statuses,
+    holdNext: (ms) => {
+      held = ms;
+    },
     close: async () => {
       server.closeAllConnections();
       await new Promise((resolve) => server.close(resolve));
