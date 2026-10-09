@@ -1,0 +1,58 @@
+name: Benchmark tests
+
+# The pure parts of the M10 benchmarks and spikes (generators, reference answers, statistics,
+# manifest checks). The benchmarks themselves need containers and are run by hand (see each README).
+on:
+  pull_request:
+    paths:
+      [
+        'tests/benchmarks/**',
+        'tests/spikes/**',
+        'infrastructure/kubernetes/**',
+        '.github/workflows/benchmark-tests.yml',
+      ]
+  push:
+    branches: [main]
+    paths:
+      [
+        'tests/benchmarks/**',
+        'tests/spikes/**',
+        'infrastructure/kubernetes/**',
+        '.github/workflows/benchmark-tests.yml',
+      ]
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: Benchmark and spike tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+
+      # One directory at a time: each has its own flat modules (corpus.py, keys.py, plan.py).
+      - name: Execution timeline
+        working-directory: tests/benchmarks/timeline
+        run: uv run --python 3.13 --with pytest pytest -q
+
+      - name: Retrieval
+        working-directory: tests/benchmarks/retrieval
+        run: uv run --python 3.13 --with numpy --with pytest pytest -q
+
+      - name: Analytics
+        working-directory: tests/benchmarks/analytics
+        run: uv run --python 3.13 --with pytest pytest -q
+
+      - name: Temporal spike
+        working-directory: tests/spikes/temporal
+        run: uv run --python 3.13 --with pytest pytest -q
+
+      - name: Kubernetes manifests
+        working-directory: infrastructure/kubernetes/spike
+        run: uv run --python 3.13 --with pyyaml --with pytest pytest -q
