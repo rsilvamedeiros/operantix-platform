@@ -1,5 +1,6 @@
 import { type Keyring, KeyringError, parseKeyring } from '@operantix/secrets';
 import { z } from 'zod';
+import type { CircuitPolicy } from './webhooks/circuit-breaker';
 
 const port = z.coerce.number().int().min(1).max(65535);
 const positive = z.coerce.number().int().positive();
@@ -23,6 +24,10 @@ const EnvSchema = z
     WEBHOOK_RETRY_BASE_DELAY_MS: positive.default(30_000),
     WEBHOOK_RETRY_MAX_DELAY_MS: positive.default(3_600_000),
     WEBHOOK_DISABLE_AFTER_FAILURES: positive.default(20),
+    // Per-endpoint circuit breaker (ADR-0032): trips well before the endpoint is disabled.
+    WEBHOOK_CIRCUIT_FAILURE_THRESHOLD: positive.default(5),
+    WEBHOOK_CIRCUIT_COOLDOWN_MS: positive.default(30_000),
+    WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS: positive.default(900_000),
     WEBHOOK_HTTP_TIMEOUT_MS: positive.default(10_000),
     WEBHOOK_HTTP_ALLOW_PRIVATE_NETWORKS: z.enum(['true', 'false']).default('false'),
     WEBHOOK_HTTP_MAX_RESPONSE_BYTES: positive.max(65_536).default(4_096),
@@ -35,6 +40,14 @@ const EnvSchema = z
       message: 'Private network access is not allowed in production',
     },
   )
+  .refine((e) => e.WEBHOOK_CIRCUIT_FAILURE_THRESHOLD < e.WEBHOOK_DISABLE_AFTER_FAILURES, {
+    path: ['WEBHOOK_CIRCUIT_FAILURE_THRESHOLD'],
+    message: 'Must be lower than WEBHOOK_DISABLE_AFTER_FAILURES',
+  })
+  .refine((e) => e.WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS >= e.WEBHOOK_CIRCUIT_COOLDOWN_MS, {
+    path: ['WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS'],
+    message: 'Must not be lower than WEBHOOK_CIRCUIT_COOLDOWN_MS',
+  })
   // A request outliving its lease could be claimed and sent twice by another instance.
   .refine((e) => e.WEBHOOK_HTTP_TIMEOUT_MS < e.WEBHOOK_LEASE_SECONDS * 1000, {
     path: ['WEBHOOK_HTTP_TIMEOUT_MS'],
@@ -50,6 +63,7 @@ export interface DeliveryConfig {
   maxDelayMs: number;
   /** Consecutive failed attempts after which an endpoint is disabled. */
   disableAfterFailures: number;
+  circuit: CircuitPolicy;
 }
 
 export interface IntegrationConfig {
@@ -107,6 +121,11 @@ export function loadConfig(env: Record<string, string | undefined>): Integration
       baseDelayMs: e.WEBHOOK_RETRY_BASE_DELAY_MS,
       maxDelayMs: e.WEBHOOK_RETRY_MAX_DELAY_MS,
       disableAfterFailures: e.WEBHOOK_DISABLE_AFTER_FAILURES,
+      circuit: {
+        failureThreshold: e.WEBHOOK_CIRCUIT_FAILURE_THRESHOLD,
+        cooldownMs: e.WEBHOOK_CIRCUIT_COOLDOWN_MS,
+        maxCooldownMs: e.WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS,
+      },
     },
     http: {
       timeoutMs: e.WEBHOOK_HTTP_TIMEOUT_MS,
