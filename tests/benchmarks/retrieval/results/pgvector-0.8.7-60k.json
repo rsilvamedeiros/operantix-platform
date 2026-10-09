@@ -1,0 +1,134 @@
+{
+  "parameters": {
+    "dsn": "<dsn>",
+    "tenants": 30,
+    "vectors": 60000,
+    "dim": 384,
+    "queries": 300
+  },
+  "tenant_sizes": {
+    "min": 106,
+    "max": 7028
+  },
+  "table_size": "96 MB",
+  "variants": [
+    {
+      "variant": "exact (btree on organization_id, sort by distance)",
+      "settings": {},
+      "access_paths_seen": ["btree on organization_id + sort"],
+      "recall_at_10": 1.0,
+      "underfilled_queries": "0/300",
+      "p50_ms": 1.53,
+      "p95_ms": 4.07,
+      "p99_ms": 5.8
+    },
+    {
+      "variant": "hnsw, ef_search=40 (default)",
+      "settings": {
+        "hnsw.ef_search": "40"
+      },
+      "access_paths_seen": ["btree on organization_id + sort", "hnsw"],
+      "recall_at_10": 0.9387,
+      "underfilled_queries": "8/300",
+      "p50_ms": 1.67,
+      "p95_ms": 3.35,
+      "p99_ms": 4.08
+    },
+    {
+      "variant": "hnsw, ef_search=200",
+      "settings": {
+        "hnsw.ef_search": "200"
+      },
+      "access_paths_seen": ["btree on organization_id + sort"],
+      "recall_at_10": 1.0,
+      "underfilled_queries": "0/300",
+      "p50_ms": 1.52,
+      "p95_ms": 3.84,
+      "p99_ms": 6.03
+    },
+    {
+      "variant": "hnsw, ef_search=100 + iterative_scan=relaxed_order",
+      "settings": {
+        "hnsw.ef_search": "100",
+        "hnsw.iterative_scan": "relaxed_order"
+      },
+      "access_paths_seen": ["btree on organization_id + sort", "hnsw"],
+      "recall_at_10": 0.9943,
+      "underfilled_queries": "0/300",
+      "p50_ms": 1.61,
+      "p95_ms": 3.53,
+      "p99_ms": 4.55
+    },
+    {
+      "variant": "hnsw only, ef_search=40 (default)",
+      "settings": {
+        "hnsw.ef_search": "40",
+        "enable_seqscan": "off"
+      },
+      "access_paths_seen": ["hnsw"],
+      "recall_at_10": 0.5613,
+      "underfilled_queries": "120/300",
+      "p50_ms": 1.55,
+      "p95_ms": 2.68,
+      "p99_ms": 3.64
+    },
+    {
+      "variant": "hnsw only, ef_search=200",
+      "settings": {
+        "hnsw.ef_search": "200",
+        "enable_seqscan": "off"
+      },
+      "access_paths_seen": ["hnsw"],
+      "recall_at_10": 0.7747,
+      "underfilled_queries": "55/300",
+      "p50_ms": 2.45,
+      "p95_ms": 3.92,
+      "p99_ms": 4.73
+    },
+    {
+      "variant": "hnsw only, ef_search=100 + iterative_scan=relaxed_order",
+      "settings": {
+        "hnsw.ef_search": "100",
+        "hnsw.iterative_scan": "relaxed_order",
+        "enable_seqscan": "off"
+      },
+      "access_paths_seen": ["hnsw"],
+      "recall_at_10": 0.8487,
+      "underfilled_queries": "0/300",
+      "p50_ms": 2.25,
+      "p95_ms": 13.92,
+      "p99_ms": 27.48
+    },
+    {
+      "variant": "hnsw only, iterative_scan=strict_order",
+      "settings": {
+        "hnsw.ef_search": "100",
+        "hnsw.iterative_scan": "strict_order",
+        "enable_seqscan": "off"
+      },
+      "access_paths_seen": ["hnsw"],
+      "recall_at_10": 0.7287,
+      "underfilled_queries": "7/300",
+      "p50_ms": 2.51,
+      "p95_ms": 72.85,
+      "p99_ms": 106.36
+    },
+    {
+      "variant": "hnsw only, relaxed_order, max_scan_tuples=200000",
+      "settings": {
+        "hnsw.ef_search": "100",
+        "hnsw.iterative_scan": "relaxed_order",
+        "hnsw.max_scan_tuples": "200000",
+        "enable_seqscan": "off"
+      },
+      "access_paths_seen": ["hnsw"],
+      "recall_at_10": 0.8487,
+      "underfilled_queries": "0/300",
+      "p50_ms": 2.18,
+      "p95_ms": 13.38,
+      "p99_ms": 26.94
+    }
+  ],
+  "hnsw_build_seconds": 14.8,
+  "hnsw_index_size": "117 MB"
+}
