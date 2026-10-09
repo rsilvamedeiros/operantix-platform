@@ -45,6 +45,8 @@ OpenTelemetry · Authentication · RBAC · Multi-tenancy · Audit · CI/CD
 
 ## Comece aqui
 
+Quer só rodar o projeto? Siga `docs/development/getting-started.md`.
+
 1. Leia `CLAUDE.md`.
 2. Leia `docs/00-start-here.md`.
 3. Leia `docs/product/vision.md` e `docs/product/capabilities.md`.
