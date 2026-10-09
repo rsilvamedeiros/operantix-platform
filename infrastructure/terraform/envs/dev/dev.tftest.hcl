@@ -26,6 +26,12 @@ mock_provider "aws" {
     }
   }
 
+  mock_resource "aws_secretsmanager_secret" {
+    defaults = {
+      arn = "arn:aws:secretsmanager:eu-west-1:123456789012:secret:operantix-dev/x-AbCdEf"
+    }
+  }
+
   mock_resource "aws_iam_role" {
     defaults = {
       arn = "arn:aws:iam::123456789012:role/test"
@@ -88,13 +94,13 @@ run "each_workload_reads_only_its_own_database_login" {
   command = apply
 
   assert {
-    condition     = length(output.database_secret_arns["platform-api"]) == 1 && length(setintersection(output.database_secret_arns["platform-api"], output.database_secret_arns["workflow-worker"])) == 0
-    error_message = "The API and the worker must not share a database credential."
+    condition     = length(toset(values(output.database_secrets))) == length(output.database_secrets)
+    error_message = "No two workloads may share a database credential."
   }
 
   assert {
-    condition     = length(toset(flatten(values(output.database_secret_arns)))) == 4
-    error_message = "Four workloads, four distinct database credentials."
+    condition     = alltrue([for workload, key in output.database_secrets : key == "database/${workload}"])
+    error_message = "Each workload must map to the database secret named after it."
   }
 }
 
@@ -107,12 +113,17 @@ run "only_workloads_that_need_it_get_the_ai_token" {
   }
 }
 
-run "the_deploy_role_is_scoped_to_dev" {
+run "publishes_everything_the_deploy_workflow_needs" {
   command = apply
 
   assert {
-    condition     = output.deploy_role_arn != ""
-    error_message = "The pipeline needs a role to assume."
+    condition     = toset(keys(output.github_environment_variables)) == toset(["AWS_ROLE_ARN", "AWS_REGION", "ECS_CLUSTER", "NAME_PREFIX", "ECR_REGISTRY", "PRIVATE_SUBNET_IDS", "APP_SECURITY_GROUP_ID"])
+    error_message = "deploy.yml reads these variables from the GitHub Environment (ADR-0039)."
+  }
+
+  assert {
+    condition     = output.github_environment_variables["NAME_PREFIX"] == "operantix-dev" && output.github_environment_variables["ECR_REGISTRY"] == "123456789012.dkr.ecr.eu-west-1.amazonaws.com"
+    error_message = "The prefix and registry must match what the services and images use."
   }
 }
 
