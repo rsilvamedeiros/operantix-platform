@@ -64,12 +64,8 @@
           "name": "memberships_organization_id_organizations_id_fk",
           "tableFrom": "memberships",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -77,12 +73,8 @@
           "name": "memberships_user_id_users_id_fk",
           "tableFrom": "memberships",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -92,10 +84,7 @@
         "memberships_organization_id_user_id_unique": {
           "name": "memberships_organization_id_user_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "user_id"
-          ]
+          "columns": ["organization_id", "user_id"]
         }
       },
       "policies": {},
@@ -146,9 +135,7 @@
         "users_auth_subject_unique": {
           "name": "users_auth_subject_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "auth_subject"
-          ]
+          "columns": ["auth_subject"]
         }
       },
       "policies": {},
@@ -193,9 +180,7 @@
         "organizations_slug_unique": {
           "name": "organizations_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -245,12 +230,8 @@
           "name": "workspaces_organization_id_organizations_id_fk",
           "tableFrom": "workspaces",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -260,18 +241,12 @@
         "workspaces_organization_id_slug_unique": {
           "name": "workspaces_organization_id_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "slug"
-          ]
+          "columns": ["organization_id", "slug"]
         },
         "workspaces_organization_id_id_unique": {
           "name": "workspaces_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -419,14 +394,8 @@
           "name": "workflow_versions_organization_id_workflow_id_workflows_organization_id_id_fk",
           "tableFrom": "workflow_versions",
           "tableTo": "workflows",
-          "columnsFrom": [
-            "organization_id",
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "workflow_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -436,10 +405,7 @@
         "workflow_versions_workflow_id_version_unique": {
           "name": "workflow_versions_workflow_id_version_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "workflow_id",
-            "version"
-          ]
+          "columns": ["workflow_id", "version"]
         }
       },
       "policies": {},
@@ -508,14 +474,8 @@
           "name": "workflows_organization_id_workspace_id_workspaces_organization_id_id_fk",
           "tableFrom": "workflows",
           "tableTo": "workspaces",
-          "columnsFrom": [
-            "organization_id",
-            "workspace_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "workspace_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -525,18 +485,12 @@
         "workflows_workspace_id_key_unique": {
           "name": "workflows_workspace_id_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "workspace_id",
-            "key"
-          ]
+          "columns": ["workspace_id", "key"]
         },
         "workflows_organization_id_id_unique": {
           "name": "workflows_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -636,14 +590,8 @@
           "name": "execution_events_organization_id_execution_id_executions_organization_id_id_fk",
           "tableFrom": "execution_events",
           "tableTo": "executions",
-          "columnsFrom": [
-            "organization_id",
-            "execution_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "execution_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -740,14 +688,8 @@
           "name": "execution_jobs_organization_id_execution_id_executions_organization_id_id_fk",
           "tableFrom": "execution_jobs",
           "tableTo": "executions",
-          "columnsFrom": [
-            "organization_id",
-            "execution_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "execution_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -757,9 +699,7 @@
         "execution_jobs_execution_id_unique": {
           "name": "execution_jobs_execution_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "execution_id"
-          ]
+          "columns": ["execution_id"]
         }
       },
       "policies": {},
@@ -894,14 +834,8 @@
           "name": "executions_organization_id_workflow_id_workflows_organization_id_id_fk",
           "tableFrom": "executions",
           "tableTo": "workflows",
-          "columnsFrom": [
-            "organization_id",
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "workflow_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -909,14 +843,8 @@
           "name": "executions_workflow_id_workflow_version_workflow_versions_workflow_id_version_fk",
           "tableFrom": "executions",
           "tableTo": "workflow_versions",
-          "columnsFrom": [
-            "workflow_id",
-            "workflow_version"
-          ],
-          "columnsTo": [
-            "workflow_id",
-            "version"
-          ],
+          "columnsFrom": ["workflow_id", "workflow_version"],
+          "columnsTo": ["workflow_id", "version"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -926,19 +854,12 @@
         "executions_organization_id_id_unique": {
           "name": "executions_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         },
         "executions_organization_id_workflow_id_idempotency_key_unique": {
           "name": "executions_organization_id_workflow_id_idempotency_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "workflow_id",
-            "idempotency_key"
-          ]
+          "columns": ["organization_id", "workflow_id", "idempotency_key"]
         }
       },
       "policies": {},
@@ -1026,14 +947,8 @@
           "name": "step_executions_organization_id_execution_id_executions_organization_id_id_fk",
           "tableFrom": "step_executions",
           "tableTo": "executions",
-          "columnsFrom": [
-            "organization_id",
-            "execution_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "execution_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1043,18 +958,12 @@
         "step_executions_execution_id_step_id_unique": {
           "name": "step_executions_execution_id_step_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "execution_id",
-            "step_id"
-          ]
+          "columns": ["execution_id", "step_id"]
         },
         "step_executions_execution_id_position_unique": {
           "name": "step_executions_execution_id_position_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "execution_id",
-            "position"
-          ]
+          "columns": ["execution_id", "position"]
         }
       },
       "policies": {},
@@ -1155,12 +1064,8 @@
           "name": "outbox_events_organization_id_organizations_id_fk",
           "tableFrom": "outbox_events",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1170,9 +1075,7 @@
         "outbox_events_event_id_unique": {
           "name": "outbox_events_event_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "event_id"
-          ]
+          "columns": ["event_id"]
         }
       },
       "policies": {},
@@ -1228,12 +1131,8 @@
           "name": "secrets_organization_id_organizations_id_fk",
           "tableFrom": "secrets",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1243,10 +1142,7 @@
         "secrets_organization_id_id_unique": {
           "name": "secrets_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -1328,12 +1224,8 @@
           "name": "webhook_endpoints_organization_id_organizations_id_fk",
           "tableFrom": "webhook_endpoints",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1341,14 +1233,8 @@
           "name": "webhook_endpoints_organization_id_signing_secret_id_secrets_organization_id_id_fk",
           "tableFrom": "webhook_endpoints",
           "tableTo": "secrets",
-          "columnsFrom": [
-            "organization_id",
-            "signing_secret_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "signing_secret_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1358,10 +1244,7 @@
         "webhook_endpoints_organization_id_id_unique": {
           "name": "webhook_endpoints_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -1512,14 +1395,8 @@
           "name": "webhook_deliveries_organization_id_endpoint_id_webhook_endpoints_organization_id_id_fk",
           "tableFrom": "webhook_deliveries",
           "tableTo": "webhook_endpoints",
-          "columnsFrom": [
-            "organization_id",
-            "endpoint_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "endpoint_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1529,18 +1406,12 @@
         "webhook_deliveries_endpoint_id_event_id_unique": {
           "name": "webhook_deliveries_endpoint_id_event_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "endpoint_id",
-            "event_id"
-          ]
+          "columns": ["endpoint_id", "event_id"]
         },
         "webhook_deliveries_organization_id_id_unique": {
           "name": "webhook_deliveries_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -1624,14 +1495,8 @@
           "name": "webhook_delivery_attempts_organization_id_delivery_id_webhook_deliveries_organization_id_id_fk",
           "tableFrom": "webhook_delivery_attempts",
           "tableTo": "webhook_deliveries",
-          "columnsFrom": [
-            "organization_id",
-            "delivery_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "delivery_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1691,12 +1556,8 @@
           "name": "inbound_webhooks_organization_id_organizations_id_fk",
           "tableFrom": "inbound_webhooks",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1704,14 +1565,8 @@
           "name": "inbound_webhooks_organization_id_workflow_id_workflows_organization_id_id_fk",
           "tableFrom": "inbound_webhooks",
           "tableTo": "workflows",
-          "columnsFrom": [
-            "organization_id",
-            "workflow_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "workflow_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1719,14 +1574,8 @@
           "name": "inbound_webhooks_organization_id_signing_secret_id_secrets_organization_id_id_fk",
           "tableFrom": "inbound_webhooks",
           "tableTo": "secrets",
-          "columnsFrom": [
-            "organization_id",
-            "signing_secret_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "signing_secret_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1736,10 +1585,7 @@
         "inbound_webhooks_organization_id_id_unique": {
           "name": "inbound_webhooks_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         }
       },
       "policies": {},
@@ -1814,12 +1660,8 @@
           "name": "connections_organization_id_organizations_id_fk",
           "tableFrom": "connections",
           "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -1827,14 +1669,8 @@
           "name": "connections_organization_id_credential_secret_id_secrets_organization_id_id_fk",
           "tableFrom": "connections",
           "tableTo": "secrets",
-          "columnsFrom": [
-            "organization_id",
-            "credential_secret_id"
-          ],
-          "columnsTo": [
-            "organization_id",
-            "id"
-          ],
+          "columnsFrom": ["organization_id", "credential_secret_id"],
+          "columnsTo": ["organization_id", "id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1844,18 +1680,12 @@
         "connections_organization_id_id_unique": {
           "name": "connections_organization_id_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "id"
-          ]
+          "columns": ["organization_id", "id"]
         },
         "connections_organization_id_name_unique": {
           "name": "connections_organization_id_name_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "name"
-          ]
+          "columns": ["organization_id", "name"]
         }
       },
       "policies": {},
@@ -1867,36 +1697,17 @@
     "public.role": {
       "name": "role",
       "schema": "public",
-      "values": [
-        "OWNER",
-        "ADMIN",
-        "DEVELOPER",
-        "OPERATOR",
-        "VIEWER"
-      ]
+      "values": ["OWNER", "ADMIN", "DEVELOPER", "OPERATOR", "VIEWER"]
     },
     "public.execution_status": {
       "name": "execution_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "RUNNING",
-        "SUCCEEDED",
-        "FAILED",
-        "CANCELLED"
-      ]
+      "values": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"]
     },
     "public.step_status": {
       "name": "step_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "RUNNING",
-        "SUCCEEDED",
-        "FAILED",
-        "SKIPPED",
-        "WAITING"
-      ]
+      "values": ["PENDING", "RUNNING", "SUCCEEDED", "FAILED", "SKIPPED", "WAITING"]
     }
   },
   "schemas": {},
