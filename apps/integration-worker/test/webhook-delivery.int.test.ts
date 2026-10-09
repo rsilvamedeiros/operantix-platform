@@ -109,6 +109,46 @@ describe('webhook delivery', () => {
     });
   });
 
+  describe('backlog', () => {
+    const seedDelivery = async (set: string) => {
+      const org = await database.seedOrganization();
+      const endpoint = await database.seedEndpoint(org, { url: receiver.url('/backlog') });
+      await fanOut.handle(completedEvent(org));
+      await database.owner.query(`UPDATE webhook_deliveries SET ${set} WHERE endpoint_id = $1`, [
+        endpoint.id,
+      ]);
+    };
+
+    beforeEach(async () => {
+      await database.owner.query('DELETE FROM webhook_delivery_attempts');
+      await database.owner.query('DELETE FROM webhook_deliveries');
+    });
+
+    it('is empty when nothing is due', async () => {
+      expect(await dispatcher.backlog()).toEqual({ waiting: 0, oldestWaitingSeconds: 0 });
+    });
+
+    it('counts due deliveries across tenants and reports the age of the oldest', async () => {
+      await seedDelivery("next_attempt_at = now() - interval '75 seconds'");
+      await seedDelivery("next_attempt_at = now() - interval '5 seconds'");
+
+      const backlog = await dispatcher.backlog();
+
+      expect(backlog.waiting).toBe(2);
+      expect(backlog.oldestWaitingSeconds).toBeGreaterThanOrEqual(75);
+      expect(backlog.oldestWaitingSeconds).toBeLessThan(105);
+    });
+
+    it('leaves out deliveries that are scheduled later, leased, or finished', async () => {
+      await seedDelivery("next_attempt_at = now() + interval '1 hour'");
+      await seedDelivery("lease_expires_at = now() + interval '30 seconds'");
+      await seedDelivery("status = 'SUCCEEDED', completed_at = now()");
+      await seedDelivery("next_attempt_at = now() - interval '1 second'");
+
+      expect((await dispatcher.backlog()).waiting).toBe(1);
+    });
+  });
+
   describe('circuit breaker', () => {
     const circuit = { failureThreshold: 2, cooldownMs: 60_000, maxCooldownMs: 240_000 };
     let breaker: WebhookDispatcher;

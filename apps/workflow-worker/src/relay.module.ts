@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { KafkaEventPublisher, PollingLoop } from '@operantix/messaging';
 import { Pool } from 'pg';
+import { registerOutboxGauges } from './backlog-metrics';
 import { OutboxRelay } from './outbox/outbox-relay';
 import type { RelayConfig } from './relay-config';
 
@@ -74,8 +75,11 @@ export class RelayModule {
         {
           provide: OutboxRelay,
           inject: [POOL, KafkaEventPublisher],
-          useFactory: (pool: Pool, publisher: KafkaEventPublisher) =>
-            new OutboxRelay(pool, publisher, config.relay),
+          useFactory: (pool: Pool, publisher: KafkaEventPublisher) => {
+            const relay = new OutboxRelay(pool, publisher, config.relay);
+            registerOutboxGauges(relay);
+            return relay;
+          },
         },
         {
           provide: LOOP,

@@ -13,6 +13,7 @@ exported every 15 s. Instruments, with Prometheus names in parentheses:
 | `operantix.execution.runs` (`operantix_execution_runs_total`) | `outcome` | workflow worker, one per run |
 | `operantix.step.duration` (`operantix_step_duration_milliseconds`) | `step.type`, `outcome` (`success`, `failure`, `suspended`) | workflow worker, per step attempt |
 | `operantix.consumer.deliveries` / `operantix.consumer.duration` | `topic`, `outcome` (`success`, `error`) | `KafkaEventConsumer`, per delivery attempt |
+| `operantix.execution.queue.depth` / `.oldest_age`, `operantix.outbox.unpublished` / `.oldest_age`, `operantix.webhook.queue.depth` / `.oldest_age` | none | backlog gauges read from PostgreSQL at each collection; scaling signals (ADR-0033, `docs/operations/autoscaling.md`) |
 
 No instrument uses a tenant, user, execution or error message as a label. Dashboard `Operantix RED`
 in Grafana (folder Operantix) shows request rate, 5xx ratio, p95 latency, runs by outcome, step p95

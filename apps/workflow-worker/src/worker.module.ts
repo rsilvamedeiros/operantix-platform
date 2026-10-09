@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { SecretCipher } from '@operantix/secrets';
 import { Pool } from 'pg';
+import { registerQueueGauges } from './backlog-metrics';
 import type { WorkerConfig } from './config';
 import { createDatabase } from './database';
 import { ExecutionRunner } from './execution/execution-runner';
@@ -78,6 +79,7 @@ export class WorkerModule {
               workerId: config.workerId,
               leaseSeconds: config.queue.leaseSeconds,
             });
+            registerQueueGauges(queue);
             const dispatcher = new StepDispatcher([
               new LogStep(),
               new DelayStep(),

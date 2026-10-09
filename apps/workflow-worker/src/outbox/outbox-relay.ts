@@ -23,6 +23,13 @@ const LEADER_LOCK = `hashtext('operantix:outbox-relay')`;
 // Rows deleted per cleanup statement, to keep each delete short.
 const CLEANUP_BATCH = 1_000;
 
+/** Events written but not yet acknowledged by the broker. */
+export interface OutboxBacklog {
+  unpublished: number;
+  /** Seconds the oldest unpublished event has waited; 0 when none do. */
+  oldestUnpublishedSeconds: number;
+}
+
 /**
  * Publishes the transactional outbox (ADR-0011, ADR-0021): unpublished rows in `id` order,
  * marked published only after the broker acknowledged them. A crash between publish and
@@ -72,6 +79,19 @@ export class OutboxRelay {
       [this.options.retentionHours, CLEANUP_BATCH],
     );
     return rowCount ?? 0;
+  }
+
+  /** How much is waiting to be published; readable by any relay replica, leader or not. */
+  async backlog(): Promise<OutboxBacklog> {
+    const { rows } = await this.pool.query<{ unpublished: string; oldest: number | null }>(
+      `SELECT count(*) AS unpublished,
+              extract(epoch FROM now() - min(created_at))::float8 AS oldest
+       FROM outbox_events WHERE published_at IS NULL`,
+    );
+    return {
+      unpublished: Number(rows[0]?.unpublished ?? 0),
+      oldestUnpublishedSeconds: Math.max(0, rows[0]?.oldest ?? 0),
+    };
   }
 
   /** Gives up leadership, so another relay can take over. */
