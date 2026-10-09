@@ -48,20 +48,14 @@ describe('AppShell', () => {
   it('marks only the current page with aria-current', () => {
     renderShell('/workflows');
 
-    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 
   it('treats a nested path as inside its section, but "/" only as itself', () => {
     renderShell('/workflows/abc');
 
-    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(screen.getByRole('link', { name: 'Workflows' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: 'Overview' })).not.toHaveAttribute('aria-current');
   });
 

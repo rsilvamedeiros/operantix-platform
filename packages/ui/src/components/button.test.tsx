@@ -22,7 +22,7 @@ describe('Button', () => {
     render(<Button onClick={onClick}>Run</Button>);
 
     await user.click(screen.getByRole('button', { name: 'Run' }));
-    await user.tab();
+    // The click left focus on the button, so the keyboard now presses it.
     await user.keyboard('{Enter}');
 
     expect(onClick).toHaveBeenCalledTimes(2);
