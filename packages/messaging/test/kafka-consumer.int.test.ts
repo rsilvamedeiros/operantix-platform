@@ -379,4 +379,30 @@ describe('Kafka event consumer', () => {
       await metrics.shutdown();
     }
   });
+  it('exports the lag of its partitions as a gauge', async () => {
+    const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    const metrics = startMetrics(
+      { serviceName: 'consumer-test', environment: 'test', endpoint: 'http://unused:4318' },
+      {
+        metricReader: new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 }),
+      },
+    );
+    try {
+      const names = await topics('lag-gauge');
+      const consumer = await consume(names, () => new Promise<void>(() => undefined));
+      for (let i = 0; i < 2; i += 1) await send(names.source, JSON.stringify(event()));
+      await untilLag(consumer, 2);
+
+      await metrics.forceFlush();
+      const gauge = (): number[] =>
+        exporter
+          .getMetrics()
+          .flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics))
+          .filter((metric) => metric.descriptor.name === 'operantix.consumer.lag')
+          .flatMap((metric) => metric.dataPoints.map((point) => Number(point.value)));
+      expect(gauge().at(-1)).toBe(2);
+    } finally {
+      await metrics.shutdown();
+    }
+  });
 });
