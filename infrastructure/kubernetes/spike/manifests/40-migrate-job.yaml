@@ -1,0 +1,46 @@
+# Runs before a release, like the ECS one-off task in ADR-0039. Uses the schema owner, which no
+# running service has.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: operantix
+  labels:
+    operantix.dev/role: workload
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels: { app: migrate }
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: operantix/platform-api:test
+          imagePullPolicy: IfNotPresent
+          command: [node, dist/database/migrate.js]
+          env:
+            - { name: NODE_ENV, value: production }
+            - { name: DATABASE_HOST, value: postgres.operantix-deps.svc.cluster.local }
+            - { name: DATABASE_NAME, value: operantix }
+            - { name: DATABASE_MIGRATION_USER, value: operantix }
+            - name: DATABASE_MIGRATION_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: operantix-secrets, key: owner-password }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
