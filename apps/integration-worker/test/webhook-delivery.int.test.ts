@@ -497,11 +497,12 @@ describe('webhook delivery', () => {
       expect(claimedByOther).toBeGreaterThan(0);
     });
 
-    it('does not send a delivery that another dispatcher took over', async () => {
+    it('does not send a queued delivery that another dispatcher took over', async () => {
       const { hits } = await run(60_000);
 
-      // The second dispatcher sent what it took; the first must not send the same ones again.
-      expect(hits).toEqual([1, 1, 1]);
+      // The second dispatcher sent all three. The first one's in-flight request was already
+      // started, so it is the one at-least-once repeat; the two it had not started are skipped.
+      expect([...hits].sort()).toEqual([1, 1, 2]);
     });
   });
 });

@@ -22,6 +22,8 @@ export interface WebhookDispatcherOptions {
   delivery: Omit<DeliveryConfig, 'pollIntervalMs'>;
   http: OutboundHttpOptions;
   keyring: Keyring;
+  /** How often the leases of a running batch are renewed; a third of the lease by default. */
+  leaseHeartbeatMs?: number;
 }
 
 interface ClaimedDelivery {
@@ -77,19 +79,80 @@ export class WebhookDispatcher {
   /** Claims one batch and delivers it; returns how many deliveries were claimed. */
   async tick(): Promise<number> {
     const claimed = await this.claim();
-    for (const delivery of claimed) {
-      try {
-        await this.deliver(delivery);
-      } catch (error) {
-        // The lease expires and the delivery is claimed again.
-        this.logger.error({
-          deliveryId: delivery.id,
-          organizationId: delivery.organizationId,
-          msg: `Delivery failed unexpectedly: ${message(error)}`,
-        });
+    if (claimed.length === 0) return 0;
+    // The batch is leased at claim time but delivered one by one, so a later delivery's lease
+    // could lapse before its turn and another dispatcher would send it too (ADR-0048).
+    const unfinished = new Map(claimed.map((delivery) => [delivery.id, delivery]));
+    const heartbeat = setInterval(() => {
+      this.renew([...unfinished.values()]).catch((error: unknown) => {
+        this.logger.warn({ msg: `Lease renewal failed: ${message(error)}` });
+      });
+    }, this.heartbeatMs());
+    try {
+      for (const delivery of claimed) {
+        await this.process(delivery, unfinished);
+        unfinished.delete(delivery.id);
       }
+    } finally {
+      clearInterval(heartbeat);
     }
     return claimed.length;
+  }
+
+  private async process(
+    delivery: ClaimedDelivery,
+    unfinished: Map<string, ClaimedDelivery>,
+  ): Promise<void> {
+    try {
+      const held = await this.renew([...unfinished.values()]);
+      if (!held.has(delivery.id)) {
+        this.logger.warn({
+          deliveryId: delivery.id,
+          organizationId: delivery.organizationId,
+          msg: 'Lease lost before the delivery started; skipping it',
+        });
+        return;
+      }
+      await this.deliver(delivery);
+    } catch (error) {
+      // The lease expires and the delivery is claimed again.
+      this.logger.error({
+        deliveryId: delivery.id,
+        organizationId: delivery.organizationId,
+        msg: `Delivery failed unexpectedly: ${message(error)}`,
+      });
+    }
+  }
+
+  private heartbeatMs(): number {
+    return (
+      this.options.leaseHeartbeatMs ?? Math.floor((this.options.delivery.leaseSeconds * 1000) / 3)
+    );
+  }
+
+  /**
+   * Renews the leases of the deliveries this dispatcher still holds and returns their ids. A
+   * delivery is held while its claim count is the one this dispatcher got: another claim bumps
+   * it. That also recovers a lease that lapsed before anyone else claimed the delivery.
+   */
+  private async renew(deliveries: ClaimedDelivery[]): Promise<Set<string>> {
+    if (deliveries.length === 0) return new Set();
+    const rows = sql.join(
+      deliveries.map((d) => sql`(${d.id}::uuid, ${d.attempts}::int)`),
+      sql`, `,
+    );
+    const { rows: held } = await this.db.execute<{ id: string }>(sql`
+      UPDATE webhook_deliveries AS w
+      SET lease_expires_at = now() + make_interval(secs => ${this.options.delivery.leaseSeconds})
+      FROM (VALUES ${rows}) AS mine(id, attempts)
+      WHERE w.id = mine.id AND w.attempts = mine.attempts AND w.status = 'PENDING'
+      RETURNING w.id`);
+    const ids = new Set(held.map((row) => row.id));
+    const lost = deliveries.length - ids.size;
+    if (lost > 0) {
+      this.logger.warn({ msg: `Lost the lease on ${String(lost)} delivery(ies) of the batch` });
+    }
+    return ids;
   }
 
   /**
