@@ -1,5 +1,7 @@
 # Local Development
 
+Passo a passo completo, a partir de um clone limpo: `docs/development/getting-started.md`.
+
 Objetivo: setup reproduzível com dependências mínimas. Apps rodam com hot reload; PostgreSQL/Redis em containers. Kafka entrou no M04; o stack de observability (collector, Tempo, Prometheus, Grafana) sobe com `docker compose --profile observability up -d`.
 
 ## Requisitos

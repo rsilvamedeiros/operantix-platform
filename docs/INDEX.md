@@ -132,6 +132,7 @@ Total de arquivos Markdown de conteúdo nesta foundation: **220**.
 - `docs/development/commits.md`
 - `docs/development/dependencies.md`
 - `docs/development/feature-flags.md`
+- `docs/development/getting-started.md`
 - `docs/development/git.md`
 - `docs/development/initial-commit.md`
 - `docs/development/nest.md`
