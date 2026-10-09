@@ -77,6 +77,7 @@ pnpm --filter @operantix/workflow-worker start       # executa as execuções
 pnpm --filter @operantix/workflow-worker start:relay # outbox -> Kafka (precisa do Kafka)
 pnpm --filter @operantix/integration-worker start    # webhooks (precisa do Kafka)
 (cd services/ai-service && uv sync && uv run ai-service)   # http://localhost:8000
+pnpm --filter @operantix/web dev                     # http://localhost:3001
 ```
 
 Confira:
@@ -85,6 +86,8 @@ Confira:
 curl localhost:3000/health/live     # {"status":"ok"}
 curl localhost:3000/health/ready    # postgres e redis "up"
 ```
+
+A página inicial do web (`http://localhost:3001`) mostra o estado da API; sem a API no ar ela mostra "Unreachable". A URL da API vem de `API_BASE_URL` (padrão `http://localhost:3000`) e `/design` mostra os tokens e componentes.
 
 Detalhes e variáveis de cada app: o README dele (`apps/*/README.md`, `services/ai-service/README.md`).
 
