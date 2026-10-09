@@ -49,7 +49,7 @@ variable "transit_encryption_enabled" {
 }
 
 variable "snapshot_retention_days" {
-  description = "Days of daily snapshots. Redis is not a source of truth (ADR-0001), so none by default."
+  description = "Days of daily snapshots. Redis is not a source of truth (ADR-0012), so none by default."
   type        = number
   default     = 0
 }
