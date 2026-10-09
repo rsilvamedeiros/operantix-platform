@@ -5,7 +5,7 @@ import {
   type OutboundHttpOptions,
 } from '@operantix/http-client';
 import { type Keyring, SecretCipher, secretContext } from '@operantix/secrets';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import type { DeliveryConfig } from '../config';
 import { type Database, withTenant } from '../database';
 import {
@@ -14,6 +14,7 @@ import {
   webhookDeliveryAttempts,
   webhookEndpoints,
 } from '../integration.schema';
+import { cooldownAfterFailure, decideCircuit } from './circuit-breaker';
 import { type AttemptResult, decideOutcome, type DeliveryOutcome } from './delivery-policy';
 import { signWebhook } from './signature';
 
@@ -36,7 +37,12 @@ interface ClaimedDelivery {
 
 type Target =
   | { kind: 'send'; url: URL; secret: string }
-  | { kind: 'skip'; errorCode: 'ENDPOINT_DISABLED' | 'SECRET_UNAVAILABLE' };
+  | { kind: 'skip'; errorCode: 'ENDPOINT_DISABLED' | 'SECRET_UNAVAILABLE' }
+  /** The endpoint's circuit is open (or another worker is probing it): try again at `until`. */
+  | { kind: 'defer'; until: Date };
+
+/** How soon to look again when another worker holds the probe. */
+const PROBE_RECHECK_MS = 5_000;
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -121,6 +127,10 @@ export class WebhookDispatcher {
     }
     const target = await this.target(delivery);
     if (!target) return;
+    if (target.kind === 'defer') {
+      await this.defer(delivery, target.until);
+      return;
+    }
     if (target.kind === 'skip') {
       await this.finish(delivery, { status: 'FAILED', errorCode: target.errorCode });
       return;
@@ -151,11 +161,40 @@ export class WebhookDispatcher {
           url: webhookEndpoints.url,
           status: webhookEndpoints.status,
           secretId: webhookEndpoints.signingSecretId,
+          consecutiveFailures: webhookEndpoints.consecutiveFailures,
+          circuitOpenUntil: webhookEndpoints.circuitOpenUntil,
         })
         .from(webhookEndpoints)
         .where(eq(webhookEndpoints.id, delivery.endpointId));
       if (!endpoint) return undefined;
       if (endpoint.status !== 'ACTIVE') return { kind: 'skip', errorCode: 'ENDPOINT_DISABLED' };
+      const { circuit } = this.options.delivery;
+      const decision = decideCircuit(
+        {
+          consecutiveFailures: endpoint.consecutiveFailures,
+          openUntil: endpoint.circuitOpenUntil,
+        },
+        circuit,
+        new Date(),
+      );
+      if (decision.kind === 'defer') return { kind: 'defer', until: decision.until };
+      if (decision.kind === 'probe') {
+        // Half-open: exactly one delivery probes. Compare-and-set re-opens the circuit for a
+        // base cooldown, so concurrent workers see it open; the outcome then closes or extends it.
+        const claimed = await tx
+          .update(webhookEndpoints)
+          .set({ circuitOpenUntil: new Date(Date.now() + circuit.cooldownMs) })
+          .where(
+            and(
+              eq(webhookEndpoints.id, delivery.endpointId),
+              sql`${webhookEndpoints.circuitOpenUntil} IS NOT DISTINCT FROM ${endpoint.circuitOpenUntil}`,
+            ),
+          )
+          .returning({ id: webhookEndpoints.id });
+        if (claimed.length === 0) {
+          return { kind: 'defer', until: new Date(Date.now() + PROBE_RECHECK_MS) };
+        }
+      }
       const [sealed] = await tx
         .select({ keyId: secrets.keyId, ciphertext: secrets.ciphertext })
         .from(secrets)
@@ -220,11 +259,11 @@ export class WebhookDispatcher {
       if (outcome.status === 'SUCCEEDED') {
         await tx
           .update(webhookEndpoints)
-          .set({ consecutiveFailures: 0 })
+          .set({ consecutiveFailures: 0, circuitOpenUntil: null })
           .where(eq(webhookEndpoints.id, delivery.endpointId));
       } else {
         // One statement, so concurrent failures on the same endpoint count correctly.
-        const threshold = this.options.delivery.disableAfterFailures;
+        const { disableAfterFailures: threshold, circuit } = this.options.delivery;
         const [endpoint] = await tx
           .update(webhookEndpoints)
           .set({
@@ -233,7 +272,19 @@ export class WebhookDispatcher {
               THEN 'DISABLED' ELSE ${webhookEndpoints.status} END`,
           })
           .where(eq(webhookEndpoints.id, delivery.endpointId))
-          .returning({ status: webhookEndpoints.status });
+          .returning({
+            status: webhookEndpoints.status,
+            consecutiveFailures: webhookEndpoints.consecutiveFailures,
+          });
+        if (endpoint) {
+          const openUntil = cooldownAfterFailure(endpoint.consecutiveFailures, circuit, new Date());
+          if (openUntil) {
+            await tx
+              .update(webhookEndpoints)
+              .set({ circuitOpenUntil: openUntil })
+              .where(eq(webhookEndpoints.id, delivery.endpointId));
+          }
+        }
         // A retry to an endpoint this failure just disabled would only fail again.
         if (endpoint?.status === 'DISABLED') {
           outcome = { status: 'FAILED', errorCode: outcome.errorCode };
@@ -256,6 +307,21 @@ export class WebhookDispatcher {
           lastStatusCode: statusCode,
           lastErrorCode: outcome.status === 'SUCCEEDED' ? null : outcome.errorCode,
           completedAt: outcome.status === 'PENDING' ? null : new Date(),
+        })
+        .where(eq(webhookDeliveries.id, delivery.id));
+    });
+  }
+
+  /** Puts a delivery back, untouched, until the endpoint's circuit may close. */
+  private defer(delivery: ClaimedDelivery, until: Date): Promise<void> {
+    return withTenant(this.db, delivery.organizationId, async (tx) => {
+      await tx
+        .update(webhookDeliveries)
+        .set({
+          // The claim counted an attempt that never happened.
+          attempts: sql`${webhookDeliveries.attempts} - 1`,
+          nextAttemptAt: until,
+          leaseExpiresAt: null,
         })
         .where(eq(webhookDeliveries.id, delivery.id));
     });

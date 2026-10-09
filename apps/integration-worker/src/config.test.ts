@@ -40,6 +40,7 @@ describe('loadConfig', () => {
         baseDelayMs: 30_000,
         maxDelayMs: 3_600_000,
         disableAfterFailures: 20,
+        circuit: { failureThreshold: 5, cooldownMs: 30_000, maxCooldownMs: 900_000 },
       },
       http: { timeoutMs: 10_000, allowPrivateNetworks: false, maxResponseBytes: 4_096 },
       secrets: { keyring: { active: 'k1', keys: new Map([['k1', Buffer.from(key, 'base64')]]) } },
@@ -79,5 +80,42 @@ describe('loadConfig', () => {
     expect(() =>
       loadConfig({ ...env, WEBHOOK_LEASE_SECONDS: '5', WEBHOOK_HTTP_TIMEOUT_MS: '5000' }),
     ).toThrow(/WEBHOOK_HTTP_TIMEOUT_MS/);
+  });
+
+  describe('circuit breaker', () => {
+    it('reads the threshold and cooldowns', () => {
+      const config = loadConfig({
+        ...env,
+        WEBHOOK_CIRCUIT_FAILURE_THRESHOLD: '3',
+        WEBHOOK_CIRCUIT_COOLDOWN_MS: '5000',
+        WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS: '60000',
+      });
+
+      expect(config.delivery.circuit).toEqual({
+        failureThreshold: 3,
+        cooldownMs: 5_000,
+        maxCooldownMs: 60_000,
+      });
+    });
+
+    it('must trip before the endpoint is disabled', () => {
+      expect(() =>
+        loadConfig({
+          ...env,
+          WEBHOOK_CIRCUIT_FAILURE_THRESHOLD: '20',
+          WEBHOOK_DISABLE_AFTER_FAILURES: '20',
+        }),
+      ).toThrow(/WEBHOOK_CIRCUIT_FAILURE_THRESHOLD/);
+    });
+
+    it('never caps the cooldown below its base', () => {
+      expect(() =>
+        loadConfig({
+          ...env,
+          WEBHOOK_CIRCUIT_COOLDOWN_MS: '60000',
+          WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS: '1000',
+        }),
+      ).toThrow(/WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS/);
+    });
   });
 });

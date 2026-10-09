@@ -22,6 +22,7 @@ pnpm --filter @operantix/integration-worker start
    - `2xx`: `SUCCEEDED`, e o endpoint volta a `consecutive_failures = 0`.
    - Falha retentável: volta a `PENDING` com `next_attempt_at` em backoff exponencial.
    - Falha permanente, ou sem tentativas restantes: `FAILED`.
+   - Circuit breaker por endpoint (ADR-0032): após `WEBHOOK_CIRCUIT_FAILURE_THRESHOLD` falhas seguidas o circuito abre e as entregas do endpoint são adiadas, sem enviar e sem gastar tentativa; passado o cooldown, uma entrega sonda e o sucesso fecha o circuito.
    - `WEBHOOK_DISABLE_AFTER_FAILURES` falhas seguidas desativam o endpoint, e as entregas pendentes dele falham com `ENDPOINT_DISABLED` sem envio.
 4. **Crash**: a entrega fica com o lease, que expira, e outro claim tenta de novo. Mais claims que `WEBHOOK_MAX_ATTEMPTS` encerram a entrega com `MAX_ATTEMPTS_EXCEEDED`.
 
@@ -46,6 +47,8 @@ Validada na inicialização (`src/config.ts`). Uma variável inválida derruba o
 | `WEBHOOK_MAX_ATTEMPTS` | `8` (máx. 20) |
 | `WEBHOOK_RETRY_BASE_DELAY_MS`, `WEBHOOK_RETRY_MAX_DELAY_MS` | `30000`, `3600000` |
 | `WEBHOOK_DISABLE_AFTER_FAILURES` | `20` |
+| `WEBHOOK_CIRCUIT_FAILURE_THRESHOLD` | `5`; precisa ser menor que o limiar de desativação |
+| `WEBHOOK_CIRCUIT_COOLDOWN_MS`, `WEBHOOK_CIRCUIT_MAX_COOLDOWN_MS` | `30000`, `900000`; o cooldown dobra a cada falha da sonda |
 | `WEBHOOK_HTTP_TIMEOUT_MS` | `10000`; precisa ser menor que o lease |
 | `WEBHOOK_HTTP_ALLOW_PRIVATE_NETWORKS` | `false`; `true` é recusado com `NODE_ENV=production` |
 | `WEBHOOK_HTTP_MAX_RESPONSE_BYTES` | `4096` (máx. 64 KiB; o corpo é descartado) |
