@@ -32,3 +32,6 @@ Terraform + AWS ECS/RDS/Redis/secret management/CI-CD.
 
 ## M10 Advanced Platform
 DynamoDB evaluation, Temporal evaluation, Kubernetes evaluation, advanced agents/analytics.
+
+## M11 Web Foundation
+Layout, design tokens, componentes acessíveis, casca do web e guia de configuração do projeto.
