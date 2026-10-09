@@ -23,6 +23,18 @@ const waitFor = async (condition: () => boolean, timeoutMs = 30_000): Promise<vo
   }
 };
 
+/** Polls the consumer's lag until it equals `expected` (commits are asynchronous). */
+const untilLag = async (consumer: KafkaEventConsumer, expected: number, timeoutMs = 30_000) => {
+  const deadline = Date.now() + timeoutMs;
+  let lag = await consumer.lag();
+  while (lag !== expected) {
+    if (Date.now() > deadline)
+      throw new Error(`Lag stayed at ${String(lag)}, wanted ${String(expected)}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    lag = await consumer.lag();
+  }
+};
+
 const header = (headers: KafkaJS.IHeaders | undefined, name: string): string | undefined => {
   const value = headers?.[name];
   return value === undefined ? undefined : value.toString();
@@ -115,6 +127,22 @@ describe('Kafka event consumer', () => {
     };
     return { deliveries, handler };
   };
+
+  it('reports how many messages the group has not committed yet', async () => {
+    const names = await topics('lag');
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const consumer = await consume(names, () => gate);
+
+    expect(await consumer.lag()).toBe(0);
+    for (let i = 0; i < 3; i += 1) await send(names.source, JSON.stringify(event()));
+    // The handler holds the first message, so none of the three is committed.
+    await untilLag(consumer, 3);
+    release();
+    await untilLag(consumer, 0);
+  });
 
   it('delivers a valid event to the handler once, then commits it', async () => {
     const names = await topics('deliver');
