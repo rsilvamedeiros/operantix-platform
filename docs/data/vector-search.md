@@ -2,7 +2,7 @@
 
 ## Initial direction
 
-Começar com PostgreSQL + pgvector quando RAG entrar no roadmap.
+Decidido no ADR-0044: PostgreSQL + pgvector, com RLS como o resto do esquema, busca exata dentro do tenant primeiro e índice aproximado (HNSW) só depois de medido.
 
 ## Data model concerns
 
