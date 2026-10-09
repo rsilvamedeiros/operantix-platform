@@ -1,0 +1,17 @@
+{
+  "throughput": {
+    "workflows": 200,
+    "activities_each": 3,
+    "seconds": 8.54,
+    "workflows_per_second": 23.4
+  },
+  "retry": {
+    "server_calls": 3,
+    "seconds": 6.1,
+    "note": "two failures, backoff 2 s then 4 s (Temporal default coefficient 2.0)"
+  },
+  "durability": {
+    "completed_steps": ["before", "wait", "after"],
+    "seconds_after_replacement": 3.1
+  }
+}
