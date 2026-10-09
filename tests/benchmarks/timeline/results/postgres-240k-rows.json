@@ -1,0 +1,32 @@
+{
+  "parameters": {
+    "pg": "<dsn>",
+    "dynamodb": "http://localhost:18000",
+    "only": "postgresql",
+    "executions": 20000,
+    "events": 12,
+    "reads": 5000,
+    "concurrency": 16
+  },
+  "results": [
+    {
+      "store": "postgresql",
+      "writes": {
+        "operations": 240000,
+        "ops_per_second": 4313.6,
+        "p50_ms": 3.31,
+        "p95_ms": 7.5,
+        "p99_ms": 10.01,
+        "max_ms": 161.8
+      },
+      "timeline_reads": {
+        "operations": 5000,
+        "ops_per_second": 3141.4,
+        "p50_ms": 4.48,
+        "p95_ms": 9.48,
+        "p99_ms": 13.5,
+        "max_ms": 89.41
+      }
+    }
+  ]
+}
