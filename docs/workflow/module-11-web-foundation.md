@@ -14,8 +14,8 @@ Dar ao `apps/web` e ao `packages/ui` uma base real de layout e estilização, e 
 
 - Passo a passo de configuração (`docs/development/getting-started.md`), validado executando os comandos.
 - Design system mínimo em `packages/ui`: tokens (cor, espaçamento, tipografia, raio), tema claro/escuro e primitivos acessíveis.
-- Casca do `apps/web` (Next.js App Router): layout raiz, `AppShell` com navegação e uma página de status que consome a Platform API.
-- Testes de componente e checagem de acessibilidade básica.
+- Casca do `apps/web` (Next.js App Router): layout raiz, `AppShell` com navegação, uma página de status que consome a Platform API e uma página `/design` com tokens e componentes.
+- Testes de componente e checagem de acessibilidade (axe em jsdom; contraste nos tokens).
 
 ## Non-goals
 
@@ -37,8 +37,8 @@ Dar ao `apps/web` e ao `packages/ui` uma base real de layout e estilização, e 
 - `pnpm install && pnpm dev` sobe o web, e o guia reproduz isso em máquina limpa.
 - Build, typecheck, lint e testes passam; o CI cobre o web e o ui.
 - Contraste e foco visível seguem WCAG AA nos tokens; componentes navegáveis por teclado.
-- Nenhum segredo no bundle do cliente; a URL da API vem de variável pública explícita.
-- Cada dependência nova está justificada no ADR-0049.
+- Nenhum segredo no bundle do cliente; a URL da API vem de uma variável de ambiente só de servidor (`API_BASE_URL`, sem `NEXT_PUBLIC_`).
+- Cada dependência nova está justificada no ADR-0049 (`axe-core`, só em teste, entra com a verificação de acessibilidade).
 
 ## Claude Code
 
