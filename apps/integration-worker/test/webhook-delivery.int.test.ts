@@ -447,4 +447,62 @@ describe('webhook delivery', () => {
       expect(receiver.received).toHaveLength(0);
     });
   });
+  describe('a batch that outlasts its lease', () => {
+    const HOLD_MS = 2_500;
+
+    /**
+     * A dispatcher claims three deliveries and its first request is held for `HOLD_MS`, longer
+     * than the 1 s lease, while a second dispatcher polls. Returns what the second one claimed
+     * and how often each path was hit.
+     */
+    const run = async (leaseHeartbeatMs: number) => {
+      const org = await database.seedOrganization();
+      const paths = ['/slow-a', '/slow-b', '/slow-c'];
+      for (const path of paths) await database.seedEndpoint(org, { url: receiver.url(path) });
+      await fanOut.handle(completedEvent(org));
+      const options = {
+        delivery: { ...delivery, leaseSeconds: 1 },
+        http: { ...http, timeoutMs: 5_000 },
+        keyring: database.keyring,
+      };
+      const mine = new WebhookDispatcher(createDatabase(database.integration), {
+        ...options,
+        leaseHeartbeatMs,
+      });
+      const other = new WebhookDispatcher(createDatabase(database.integration), options);
+
+      receiver.holdNext(HOLD_MS);
+      const ticking = mine.tick();
+      let claimedByOther = 0;
+      const deadline = Date.now() + HOLD_MS;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        claimedByOther += await other.tick();
+      }
+      await ticking;
+      const hits = paths.map((path) => receiver.received.filter((r) => r.path === path).length);
+      return { claimedByOther, hits };
+    };
+
+    it('keeps the queued deliveries of a slow batch away from other dispatchers', async () => {
+      const { claimedByOther, hits } = await run(250);
+
+      expect(claimedByOther).toBe(0);
+      expect(hits).toEqual([1, 1, 1]);
+    });
+
+    it('would otherwise hand them over (the race this guards against)', async () => {
+      const { claimedByOther } = await run(60_000);
+
+      expect(claimedByOther).toBeGreaterThan(0);
+    });
+
+    it('does not send a queued delivery that another dispatcher took over', async () => {
+      const { hits } = await run(60_000);
+
+      // The second dispatcher sent all three. The first one's in-flight request was already
+      // started, so it is the one at-least-once repeat; the two it had not started are skipped.
+      expect([...hits].sort()).toEqual([1, 1, 2]);
+    });
+  });
 });
