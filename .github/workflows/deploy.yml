@@ -1,0 +1,151 @@
+name: Deploy
+
+# Manual only (ADR-0039). Runs in a GitHub Environment whose protection rules gate the deploy.
+# Not exercised against AWS yet: the first real run in `dev` is part of M09 acceptance.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub Environment (and AWS environment) to deploy to
+        type: choice
+        options: [dev]
+        default: dev
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  images:
+    name: Build and push ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - {
+              image: platform-api,
+              dockerfile: Dockerfile.node,
+              context: .,
+              build_arg: 'APP=platform-api',
+            }
+          - {
+              image: workflow-worker,
+              dockerfile: Dockerfile.node,
+              context: .,
+              build_arg: 'APP=workflow-worker',
+            }
+          - {
+              image: integration-worker,
+              dockerfile: Dockerfile.node,
+              context: .,
+              build_arg: 'APP=integration-worker',
+            }
+          - {
+              image: ai-service,
+              dockerfile: services/ai-service/Dockerfile,
+              context: services/ai-service,
+              build_arg: '',
+            }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          IMAGE: ${{ matrix.image }}
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          CONTEXT: ${{ matrix.context }}
+          BUILD_ARG: ${{ matrix.build_arg }}
+        run: |
+          args=()
+          if [[ -n "$BUILD_ARG" ]]; then args+=(--build-arg "$BUILD_ARG"); fi
+          docker build "${args[@]}" -f "$DOCKERFILE" -t "$REGISTRY/operantix/$IMAGE:$IMAGE_TAG" "$CONTEXT"
+          docker push "$REGISTRY/operantix/$IMAGE:$IMAGE_TAG"
+
+  migrate:
+    name: Run database migrations
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      SUBNETS: ${{ vars.PRIVATE_SUBNET_IDS }}
+      SECURITY_GROUP: ${{ vars.APP_SECURITY_GROUP_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Fails the deploy when the migration task exits non-zero; no service is touched before this passes.
+      - name: Migrate
+        run: scripts/deploy/ecs-deploy.sh migrate "${{ vars.NAME_PREFIX }}-migrate" "${{ vars.ECR_REGISTRY }}/operantix/platform-api:$IMAGE_TAG"
+
+  services:
+    name: Deploy ${{ matrix.service }}
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.environment }}
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { service: platform-api, image: platform-api }
+          - { service: workflow-worker, image: workflow-worker }
+          - { service: workflow-relay, image: workflow-worker }
+          - { service: integration-worker, image: integration-worker }
+          - { service: ai-service, image: ai-service }
+    env:
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # The ECS circuit breaker (ADR-0038) rolls the service back if the new tasks never become healthy.
+      - name: Deploy
+        run: |
+          scripts/deploy/ecs-deploy.sh service \
+            "${{ vars.NAME_PREFIX }}-${{ matrix.service }}" \
+            "${{ vars.NAME_PREFIX }}-${{ matrix.service }}" \
+            "${{ vars.ECR_REGISTRY }}/operantix/${{ matrix.image }}:$IMAGE_TAG"
