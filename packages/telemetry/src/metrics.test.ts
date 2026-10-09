@@ -75,11 +75,14 @@ describe('observeGauge', () => {
     return exporter;
   }
 
-  const gauges = (exporter: InMemoryMetricExporter, name: string) =>
+  /** Every number exported for a gauge, in collection order. */
+  const readings = (exporter: InMemoryMetricExporter, name: string): number[] =>
     exporter
       .getMetrics()
       .flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics))
-      .filter((m) => m.descriptor.name === name);
+      .filter((m) => m.descriptor.name === name)
+      .flatMap((m) => m.dataPoints.map((p) => p.value))
+      .filter((value): value is number => typeof value === 'number');
 
   it('reports the value the reader returns at each collection', async () => {
     const exporter = start();
@@ -90,8 +93,7 @@ describe('observeGauge', () => {
     depth = 3;
     await handle?.forceFlush();
 
-    const points = gauges(exporter, 'operantix.test.depth').flatMap((m) => m.dataPoints);
-    expect(points.map((p) => p.value)).toEqual([7, 3]);
+    expect(readings(exporter, 'operantix.test.depth')).toEqual([7, 3]);
   });
 
   it('awaits an asynchronous reader', async () => {
@@ -100,7 +102,7 @@ describe('observeGauge', () => {
 
     await handle?.forceFlush();
 
-    expect(gauges(exporter, 'operantix.test.async')[0]?.dataPoints[0]?.value).toBe(11);
+    expect(readings(exporter, 'operantix.test.async')).toEqual([11]);
   });
 
   it('reports a failing reader to onError and exports no point for it', async () => {
@@ -116,7 +118,7 @@ describe('observeGauge', () => {
     await handle?.forceFlush();
 
     expect(errors).toEqual([new Error('db down')]);
-    expect(gauges(exporter, 'operantix.test.failing').flatMap((m) => m.dataPoints)).toEqual([]);
+    expect(readings(exporter, 'operantix.test.failing')).toEqual([]);
   });
 });
 

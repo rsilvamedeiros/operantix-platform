@@ -35,6 +35,36 @@ export function meter(): Meter {
   return metrics.getMeter(METER_NAME);
 }
 
+export interface GaugeOptions {
+  readonly description: string;
+  readonly unit?: string;
+}
+
+/**
+ * Registers a gauge read at every collection, for saturation signals such as queue depth. The
+ * reader runs only when metrics are exported; if it throws, no point is reported for that
+ * collection and `onError` gets the error (so a down database shows as a gap, not a zero).
+ */
+export function observeGauge(
+  name: string,
+  options: GaugeOptions,
+  read: () => number | Promise<number>,
+  onError?: (error: unknown) => void,
+): void {
+  meter()
+    .createObservableGauge(name, {
+      description: options.description,
+      ...(options.unit === undefined ? {} : { unit: options.unit }),
+    })
+    .addCallback(async (result) => {
+      try {
+        result.observe(await read());
+      } catch (error) {
+        onError?.(error);
+      }
+    });
+}
+
 /**
  * Starts the OpenTelemetry metrics SDK and makes it the global meter provider. Instruments must
  * keep to low-cardinality attributes (no tenant, user or execution ids; docs/observability/metrics.md).
