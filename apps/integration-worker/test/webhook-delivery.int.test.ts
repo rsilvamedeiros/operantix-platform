@@ -14,10 +14,13 @@ const delivery = {
   baseDelayMs: 60_000,
   maxDelayMs: 600_000,
   disableAfterFailures: 3,
+  // Out of reach here: the circuit breaker has its own tests below.
+  circuit: { failureThreshold: 999, cooldownMs: 60_000, maxCooldownMs: 240_000 },
 };
 const http = { timeoutMs: 1_000, allowPrivateNetworks: true, maxResponseBytes: 1_024 };
 
 interface DeliveryRow {
+  id: string;
   status: string;
   attempts: number;
   last_status_code: number | null;
@@ -52,7 +55,7 @@ describe('webhook delivery', () => {
 
   const deliveriesOf = async (endpointId: string) => {
     const { rows } = await database.owner.query<DeliveryRow>(
-      `SELECT status, attempts, last_status_code, last_error_code, next_attempt_at
+      `SELECT id, status, attempts, last_status_code, last_error_code, next_attempt_at
          FROM webhook_deliveries WHERE endpoint_id = $1`,
       [endpointId],
     );
@@ -103,6 +106,139 @@ describe('webhook delivery', () => {
 
       expect(again).toBe(0);
       expect(await deliveriesOf(endpoint.id)).toHaveLength(1);
+    });
+  });
+
+  describe('circuit breaker', () => {
+    const circuit = { failureThreshold: 2, cooldownMs: 60_000, maxCooldownMs: 240_000 };
+    let breaker: WebhookDispatcher;
+
+    beforeAll(() => {
+      breaker = new WebhookDispatcher(createDatabase(database.integration), {
+        delivery: { ...delivery, disableAfterFailures: 50, maxAttempts: 10, circuit },
+        http,
+        keyring: database.keyring,
+      });
+    });
+
+    const circuitOf = async (endpointId: string) => {
+      const { rows } = await database.owner.query<{
+        consecutive_failures: number;
+        circuit_open_until: Date | null;
+        status: string;
+      }>(
+        'SELECT consecutive_failures, circuit_open_until, status FROM webhook_endpoints WHERE id = $1',
+        [endpointId],
+      );
+      return rows[0];
+    };
+    const seconds = (ms: number) => new Date(Date.now() + ms);
+
+    it('opens after the threshold of consecutive failures, for the base cooldown', async () => {
+      const org = await database.seedOrganization();
+      const endpoint = await database.seedEndpoint(org, {
+        url: receiver.url('/trip'),
+        consecutiveFailures: circuit.failureThreshold - 1,
+      });
+      receiver.statuses.set('/trip', 503);
+      await fanOut.handle(completedEvent(org));
+
+      await breaker.tick();
+
+      const state = await circuitOf(endpoint.id);
+      expect(state?.consecutive_failures).toBe(circuit.failureThreshold);
+      const opensFor = (state?.circuit_open_until?.getTime() ?? 0) - Date.now();
+      expect(opensFor).toBeGreaterThan(circuit.cooldownMs - 5_000);
+      expect(opensFor).toBeLessThanOrEqual(circuit.cooldownMs);
+    });
+
+    it('does not call an open endpoint, and does not spend an attempt on it', async () => {
+      const org = await database.seedOrganization();
+      const openUntil = seconds(120_000);
+      const endpoint = await database.seedEndpoint(org, {
+        url: receiver.url('/open'),
+        consecutiveFailures: 3,
+        circuitOpenUntil: openUntil,
+      });
+      await fanOut.handle(completedEvent(org));
+
+      await breaker.tick();
+
+      expect(receiver.received).toHaveLength(0);
+      const [row] = await deliveriesOf(endpoint.id);
+      expect(row).toMatchObject({ status: 'PENDING', attempts: 0 });
+      expect(row?.next_attempt_at.getTime()).toBe(openUntil.getTime());
+      const { rows: attempts } = await database.owner.query(
+        'SELECT 1 FROM webhook_delivery_attempts WHERE delivery_id = $1',
+        [row?.id],
+      );
+      expect(attempts).toHaveLength(0);
+      // Not claimable again until the circuit closes.
+      expect(await breaker.tick()).toBe(0);
+    });
+
+    it('sends a single probe once the cooldown is over, and closes on success', async () => {
+      const org = await database.seedOrganization();
+      const endpoint = await database.seedEndpoint(org, {
+        url: receiver.url('/recover'),
+        consecutiveFailures: 4,
+        circuitOpenUntil: seconds(-1_000),
+      });
+      await fanOut.handle(completedEvent(org));
+      await fanOut.handle(completedEvent(org));
+      await fanOut.handle(completedEvent(org));
+
+      await breaker.tick();
+
+      expect(receiver.received).toHaveLength(1);
+      const rows = await deliveriesOf(endpoint.id);
+      expect(rows.map((r) => r.status).sort()).toEqual(['PENDING', 'PENDING', 'SUCCEEDED']);
+      expect(rows.filter((r) => r.status === 'PENDING').map((r) => r.attempts)).toEqual([0, 0]);
+      expect(await circuitOf(endpoint.id)).toMatchObject({
+        consecutive_failures: 0,
+        circuit_open_until: null,
+      });
+
+      await elapse();
+      await breaker.tick();
+      expect(receiver.received).toHaveLength(3);
+    });
+
+    it('reopens for twice as long when the probe fails', async () => {
+      const org = await database.seedOrganization();
+      const endpoint = await database.seedEndpoint(org, {
+        url: receiver.url('/still-down'),
+        consecutiveFailures: circuit.failureThreshold,
+        circuitOpenUntil: seconds(-1_000),
+      });
+      receiver.statuses.set('/still-down', 500);
+      await fanOut.handle(completedEvent(org));
+
+      await breaker.tick();
+
+      expect(receiver.received).toHaveLength(1);
+      const state = await circuitOf(endpoint.id);
+      expect(state?.consecutive_failures).toBe(circuit.failureThreshold + 1);
+      const opensFor = (state?.circuit_open_until?.getTime() ?? 0) - Date.now();
+      expect(opensFor).toBeGreaterThan(2 * circuit.cooldownMs - 5_000);
+      expect(opensFor).toBeLessThanOrEqual(2 * circuit.cooldownMs);
+    });
+
+    it('keeps one broken endpoint from holding back the others', async () => {
+      const org = await database.seedOrganization();
+      const broken = await database.seedEndpoint(org, {
+        url: receiver.url('/dead'),
+        consecutiveFailures: 3,
+        circuitOpenUntil: seconds(120_000),
+      });
+      const healthy = await database.seedEndpoint(org, { url: receiver.url('/fine') });
+      await fanOut.handle(completedEvent(org));
+
+      await breaker.tick();
+
+      expect(receiver.received.map((r) => r.path)).toEqual(['/fine']);
+      expect((await deliveriesOf(healthy.id))[0]?.status).toBe('SUCCEEDED');
+      expect((await deliveriesOf(broken.id))[0]?.status).toBe('PENDING');
     });
   });
 

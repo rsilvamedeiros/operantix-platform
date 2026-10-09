@@ -14,6 +14,7 @@ export interface EndpointOptions {
   eventTypes?: string[];
   status?: 'ACTIVE' | 'DISABLED';
   consecutiveFailures?: number;
+  circuitOpenUntil?: Date | null;
 }
 
 export interface IntegrationDatabase {
@@ -73,14 +74,16 @@ export async function startIntegrationDatabase(): Promise<IntegrationDatabase> {
       );
       const { rows } = await owner.query<{ id: string }>(
         `INSERT INTO webhook_endpoints
-           (organization_id, url, event_types, status, consecutive_failures, signing_secret_id)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+           (organization_id, url, event_types, status, consecutive_failures, circuit_open_until,
+            signing_secret_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
         [
           organizationId,
           options.url,
           options.eventTypes ?? ['execution.completed'],
           options.status ?? 'ACTIVE',
           options.consecutiveFailures ?? 0,
+          options.circuitOpenUntil ?? null,
           secretId,
         ],
       );

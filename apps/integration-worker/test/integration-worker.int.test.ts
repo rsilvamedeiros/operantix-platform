@@ -42,6 +42,7 @@ describe('integration worker', () => {
         baseDelayMs: 1_000,
         maxDelayMs: 10_000,
         disableAfterFailures: 10,
+        circuit: { failureThreshold: 5, cooldownMs: 30_000, maxCooldownMs: 900_000 },
       },
       http: { timeoutMs: 1_000, allowPrivateNetworks: true, maxResponseBytes: 1_024 },
       secrets: { keyring: database.keyring },
