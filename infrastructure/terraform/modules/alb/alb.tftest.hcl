@@ -1,4 +1,16 @@
-mock_provider "aws" {}
+mock_provider "aws" {
+  mock_resource "aws_lb" {
+    defaults = {
+      arn = "arn:aws:elasticloadbalancing:eu-west-1:123456789012:loadbalancer/app/test/abc"
+    }
+  }
+
+  mock_resource "aws_lb_target_group" {
+    defaults = {
+      arn = "arn:aws:elasticloadbalancing:eu-west-1:123456789012:targetgroup/test-api/abc"
+    }
+  }
+}
 
 variables {
   name               = "test"

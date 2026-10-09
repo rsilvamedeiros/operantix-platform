@@ -5,6 +5,12 @@ mock_provider "aws" {
     }
   }
 
+  mock_resource "aws_service_discovery_service" {
+    defaults = {
+      arn = "arn:aws:servicediscovery:eu-west-1:123456789012:service/srv-abc"
+    }
+  }
+
   mock_resource "aws_iam_role" {
     defaults = {
       arn = "arn:aws:iam::123456789012:role/test"
