@@ -23,6 +23,18 @@ const waitFor = async (condition: () => boolean, timeoutMs = 30_000): Promise<vo
   }
 };
 
+/** Polls the consumer's lag until it equals `expected` (commits are asynchronous). */
+const untilLag = async (consumer: KafkaEventConsumer, expected: number, timeoutMs = 30_000) => {
+  const deadline = Date.now() + timeoutMs;
+  let lag = await consumer.lag();
+  while (lag !== expected) {
+    if (Date.now() > deadline)
+      throw new Error(`Lag stayed at ${String(lag)}, wanted ${String(expected)}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    lag = await consumer.lag();
+  }
+};
+
 const header = (headers: KafkaJS.IHeaders | undefined, name: string): string | undefined => {
   const value = headers?.[name];
   return value === undefined ? undefined : value.toString();
@@ -115,6 +127,22 @@ describe('Kafka event consumer', () => {
     };
     return { deliveries, handler };
   };
+
+  it('reports how many messages the group has not committed yet', async () => {
+    const names = await topics('lag');
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const consumer = await consume(names, () => gate);
+
+    expect(await consumer.lag()).toBe(0);
+    for (let i = 0; i < 3; i += 1) await send(names.source, JSON.stringify(event()));
+    // The handler holds the first message, so none of the three is committed.
+    await untilLag(consumer, 3);
+    release();
+    await untilLag(consumer, 0);
+  });
 
   it('delivers a valid event to the handler once, then commits it', async () => {
     const names = await topics('deliver');
@@ -347,6 +375,32 @@ describe('Kafka event consumer', () => {
       const timed = all.find((metric) => metric.descriptor.name === 'operantix.consumer.duration');
       expect(timed?.descriptor.unit).toBe('ms');
       expect(timed?.dataPoints.length).toBeGreaterThan(0);
+    } finally {
+      await metrics.shutdown();
+    }
+  });
+  it('exports the lag of its partitions as a gauge', async () => {
+    const exporter = new InMemoryMetricExporter(AggregationTemporality.CUMULATIVE);
+    const metrics = startMetrics(
+      { serviceName: 'consumer-test', environment: 'test', endpoint: 'http://unused:4318' },
+      {
+        metricReader: new PeriodicExportingMetricReader({ exporter, exportIntervalMillis: 60_000 }),
+      },
+    );
+    try {
+      const names = await topics('lag-gauge');
+      const consumer = await consume(names, () => new Promise<void>(() => undefined));
+      for (let i = 0; i < 2; i += 1) await send(names.source, JSON.stringify(event()));
+      await untilLag(consumer, 2);
+
+      await metrics.forceFlush();
+      const gauge = (): number[] =>
+        exporter
+          .getMetrics()
+          .flatMap((rm) => rm.scopeMetrics.flatMap((sm) => sm.metrics))
+          .filter((metric) => metric.descriptor.name === 'operantix.consumer.lag')
+          .flatMap((metric) => metric.dataPoints.map((point) => Number(point.value)));
+      expect(gauge().at(-1)).toBe(2);
     } finally {
       await metrics.shutdown();
     }

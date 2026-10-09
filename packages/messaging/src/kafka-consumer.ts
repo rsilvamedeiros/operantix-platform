@@ -1,7 +1,8 @@
 import { type AnyEvent, parseEvent } from '@operantix/contracts';
 import { KafkaJS } from '@confluentinc/kafka-javascript';
-import { extractTraceContext, meter, traced } from '@operantix/telemetry';
+import { extractTraceContext, meter, observeGauge, traced } from '@operantix/telemetry';
 import { SpanKind } from '@opentelemetry/api';
+import { computeLag } from './consumer-lag';
 import type { EventPublisher } from './event-publisher';
 import {
   decodeHeaders,
@@ -60,7 +61,10 @@ class StoppedError extends Error {
 export class KafkaEventConsumer {
   private readonly main: KafkaJS.Consumer;
   private readonly retries: KafkaJS.Consumer;
+  private readonly admin: KafkaJS.Admin;
   private stopping = new AbortController();
+  private adminConnected = false;
+  private lagRegistered = false;
 
   constructor(
     private readonly options: KafkaConsumerOptions,
@@ -81,11 +85,14 @@ export class KafkaEventConsumer {
     this.retries = kafka.consumer({
       kafkaJS: { groupId: `${options.groupId}.retry`, fromBeginning: true },
     });
+    this.admin = kafka.admin();
   }
 
   async start(): Promise<void> {
     this.stopping = new AbortController();
-    await Promise.all([this.main.connect(), this.retries.connect()]);
+    await Promise.all([this.main.connect(), this.retries.connect(), this.admin.connect()]);
+    this.adminConnected = true;
+    this.registerLagGauge();
     await this.main.subscribe({ topics: this.options.topics });
     await this.retries.subscribe({ topics: [this.options.retryTopic] });
     await this.main.run({
@@ -108,7 +115,55 @@ export class KafkaEventConsumer {
   /** Stops consuming. A retry still waiting is not committed and comes back on restart. */
   async stop(): Promise<void> {
     this.stopping.abort();
-    await Promise.all([this.main.disconnect(), this.retries.disconnect()]);
+    this.adminConnected = false;
+    await Promise.all([this.main.disconnect(), this.retries.disconnect(), this.admin.disconnect()]);
+  }
+
+  /**
+   * Messages not yet committed on the partitions this member owns: the end of each partition
+   * minus the committed offset. Every replica reports its own share, so the group's lag is the
+   * sum over replicas. Rejects when the consumer is not started or the broker cannot be
+   * reached, so a caller never mistakes an unknown lag for zero.
+   *
+   * It asks the member's own consumer for the committed offsets. The admin `fetchOffsets` call
+   * crashes the native client (SIGSEGV, @confluentinc/kafka-javascript 1.11) while the group is
+   * joining, which a metrics collection can easily hit.
+   */
+  async lag(): Promise<number> {
+    if (!this.adminConnected) throw new Error('Consumer is not started');
+    const owned = this.main.assignment();
+    const committed = await this.main.committed(owned);
+    let total = 0;
+    for (const topic of this.options.topics) {
+      const partitions = new Set(owned.filter((p) => p.topic === topic).map((p) => p.partition));
+      if (partitions.size === 0) continue;
+      const ends = (await this.admin.fetchTopicOffsets(topic)).filter(({ partition }) =>
+        partitions.has(partition),
+      );
+      const offsets = committed
+        .filter((entry) => entry.topic === topic)
+        .map(({ partition, offset }) => ({ partition, offset: committedOffset(offset) }));
+      total += computeLag(
+        ends.map(({ partition, high, low }) => ({ partition, high, low })),
+        offsets,
+      );
+    }
+    return total;
+  }
+
+  /** One gauge per consumer, read at every metrics collection (docs/operations/autoscaling.md). */
+  private registerLagGauge(): void {
+    if (this.lagRegistered) return;
+    this.lagRegistered = true;
+    observeGauge(
+      'operantix.consumer.lag',
+      {
+        description:
+          'Messages not yet committed on the partitions this consumer owns (sum over replicas)',
+        unit: '{message}',
+      },
+      () => this.lag(),
+    );
   }
 
   private async process(message: KafkaJS.KafkaMessage, headers: Headers, source: Source) {
@@ -206,6 +261,11 @@ export class KafkaEventConsumer {
       });
     });
   }
+}
+
+/** The client types `offset` as a string, but it is null when the group committed nothing. */
+function committedOffset(offset: string | null): string {
+  return offset ?? '-1';
 }
 
 /** One delivery attempt ended. The topic is configuration, so the label stays bounded. */

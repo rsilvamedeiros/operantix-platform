@@ -12,10 +12,13 @@ Decisão: ADR-0033. Este documento mapeia os gauges para HPA/KEDA. Kubernetes ai
 | `operantix_webhook_queue_oldest_age_seconds` | integration-worker | Alertar |
 | `operantix_outbox_unpublished` | outbox relay | Alertar (relay tem líder único, não escala por réplica) |
 | `operantix_outbox_oldest_age_seconds` | outbox relay | Alertar: broker fora ou relay parado |
+| `operantix_consumer_lag` | consumidores Kafka (`KafkaEventConsumer`) | **Escalar** (somado entre réplicas) e alertar: mensagens ainda não confirmadas |
 
 Os nomes seguem a normalização do exporter Prometheus do collector (`.` vira `_`, unidade `s` vira `_seconds`, unidades entre chaves somem). Confirme-os na sua instância antes de fixar uma regra.
 
-Os valores são do cluster, sem label de tenant: qualquer réplica reporta o mesmo número. Se a leitura falha, o ponto some em vez de virar zero; trate ausência de dado como "manter réplicas" no escalador.
+**Exceção: `operantix_consumer_lag`.** Cada réplica reporta apenas as partições que possui; o lag do grupo é a soma entre réplicas (`sum(operantix_consumer_lag)`, não `max`). Réplica sem partições reporta 0, e réplicas além do número de partições não ajudam: limite o máximo de réplicas ao número de partições do tópico. Consumidor parado ou broker inalcançável não reporta ponto.
+
+Os demais valores são do cluster, sem label de tenant: qualquer réplica reporta o mesmo número. Se a leitura falha, o ponto some em vez de virar zero; trate ausência de dado como "manter réplicas" no escalador.
 
 ## Mapeamento
 
