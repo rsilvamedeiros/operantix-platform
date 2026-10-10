@@ -74,6 +74,7 @@ A API, o workflow worker e o web só precisam de um PostgreSQL e um Redis acess�
 
    ```bash
    # superusuário "operantix" com a senha operantix-local, como no compose
+   export PGPASSWORD=operantix-local
    createdb -h localhost -U operantix operantix
    ```
 
@@ -82,7 +83,6 @@ A API, o workflow worker e o web só precisam de um PostgreSQL e um Redis acess�
 2. Crie os papéis de aplicação, que no Docker um script faz na primeira inicialização. Rode uma vez, da raiz do repositório:
 
    ```bash
-   export PGPASSWORD=operantix-local
    cd infrastructure/docker/postgres
    for r in app worker relay integration; do
      psql -h localhost -U operantix -d operantix -v ON_ERROR_STOP=1 -v ${r}_password=operantix-local -f $r-role.sql
