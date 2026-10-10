@@ -8,7 +8,7 @@ Passo a passo para sair de um clone limpo e ter o Operantix rodando na sua máqu
 | --- | --- | --- |
 | Node.js | 22 (`.nvmrc`; `nvm use`) | apps e pacotes TypeScript |
 | pnpm | 10 (`packageManager`; `corepack enable`) | workspaces |
-| Docker + Compose | recente | PostgreSQL, Redis e Kafka locais; Testcontainers nos testes de integração |
+| Docker + Compose | recente | PostgreSQL, Redis e Kafka locais; Testcontainers nos testes de integração. Opcional para rodar o app: veja "Sem Docker" no passo 4 |
 | [uv](https://docs.astral.sh/uv/) | recente | só para o `services/ai-service` (instala o Python 3.13 sozinho) |
 
 ## 2. Instalar e verificar
@@ -66,6 +66,34 @@ docker compose --profile observability up -d        # opcional: collector, Tempo
 
 Se o volume do PostgreSQL é anterior aos scripts de papéis, recrie: `docker compose down -v && docker compose up -d`.
 
+### Sem Docker
+
+A API, o workflow worker e o web só precisam de um PostgreSQL e um Redis acessíveis; o Docker é uma conveniência. Validado em Linux com PostgreSQL 16 e Redis (o compose usa o PostgreSQL 17, e as migrations rodam nos dois). No macOS use `brew install postgresql@17 redis`; no Windows, WSL2 com os pacotes do Linux (não validado).
+
+1. Suba os dois serviços na máquina (porta 5432 e 6379) e crie o superusuário e o banco com a senha do `.env`:
+
+   ```bash
+   # superusuário "operantix" com a senha operantix-local, como no compose
+   createdb -h localhost -U operantix operantix
+   ```
+
+   Em uma instalação nova do Linux, `initdb -U operantix --auth=md5 --pwfile=<arquivo com a senha>` cria o cluster com esse usuário.
+
+2. Crie os papéis de aplicação, que no Docker um script faz na primeira inicialização. Rode uma vez, da raiz do repositório:
+
+   ```bash
+   export PGPASSWORD=operantix-local
+   cd infrastructure/docker/postgres
+   for r in app worker relay integration; do
+     psql -h localhost -U operantix -d operantix -v ON_ERROR_STOP=1 -v ${r}_password=operantix-local -f $r-role.sql
+   done
+   cd -
+   ```
+
+3. Siga o passo 5 normalmente (`db:migrate` e os `start`).
+
+Limites sem Docker: o relay e o integration worker precisam de um Kafka (instale um broker na porta 9092 e crie os tópicos de `infrastructure/docker/kafka/create-topics.sh`; não validado), e `pnpm test:integration` usa Testcontainers, então exige Docker. Os testes unitários (`pnpm test`) não precisam.
+
 ## 5. Aplicar o schema e subir os serviços
 
 Cada comando em um terminal próprio, com o `.env` carregado.
@@ -106,4 +134,4 @@ Detalhes e variáveis de cada app: o README dele (`apps/*/README.md`, `services/
 | `/health/ready` em 503 logo após subir | O Redis reconecta em segundo plano; tente de novo em alguns segundos. |
 | Worker de integração/relay com `Connection refused` em `localhost:9092` | Suba o Kafka: `docker compose up -d kafka kafka-init`. |
 | `uv` com erro de certificado atrás de proxy | `export UV_SYSTEM_CERTS=1` |
-| Testes de integração não acham o Docker | Inicie o daemon; em ambientes sem Ryuk, `TESTCONTAINERS_RYUK_DISABLED=true`. |
+| Testes de integração não acham o Docker | Eles exigem Docker. Inicie o daemon; em ambientes sem Ryuk, `TESTCONTAINERS_RYUK_DISABLED=true`. |
